@@ -1,5 +1,5 @@
-function Write_SEABASS_UVP_zoo
-%% FUNCTION WRITE_SEABASS_UVP_ZOO
+function Write_SEABASS_Level2_UVP_zoo
+%% FUNCTION WRITE_SEABASS_LEVEL2_UVP_ZOO
 % Description:
 %   Reads in detailed ODV formatted file exported from Ecotaxa Particle
 %   Module and creates a file for submission to NASA's SEABASS database
