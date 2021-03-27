@@ -26,53 +26,63 @@ remove_all_but_salp_and_salpfeces = 1;
 %% Define read and write filenames
 %% EXPORTSNP survey cruise R/V Sally Ride
 cruiseid = 'SR1812';
-odv_rfile = 'D:\MATLAB\EXPORTS_UVP_SEABASS\export_detailed_20210219_19_10\export_detailed_20210219_19_10_ZOO_odv.txt';
-odv_wfile = 'EXPORTS-EXPORTSNP_UVP5-Taxonomic_survey_20180814-20180909_R0.sb';
-r2r_elog  = 'D:\MATLAB\EXPORTS_UVP_SEABASS\R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx';
+projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
+odv_rfile = fullfile(projectdir,'export_detailed_20210201_19_26','export_detailed_20210201_19_26_ZOO_odv.txt');
+odv_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel2_survey_20180814-20180909_R0.sb';
+r2r_elog  = fullfile(projectdir,'R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx');
+
 %% EXPORTSNP process cruise R/V Roger Revelle
 % cruiseid = 'RR1813';
-% odv_rfile = 'D:\MATLAB\EXPORTS_UVP_SEABASS\export_detailed_20210128_08_11\export_detailed_20210128_08_11_ZOO_odv.txt';
-% odv_wfile = 'EXPORTS-EXPORTSNP_UVP5-Taxonomic_process_20180814-20180909_R0.sb';
-% r2r_elog  = 'D:\MATLAB\EXPORTS_UVP_SEABASS\R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx';
+% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
+% odv_rfile = fullfile(projectdir,'export_detailed_20210128_08_11','export_detailed_20210128_08_11_ZOO_odv.txt');
+% odv_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel2_process_20180814-20180909_R0.sb';
+% r2r_elog  = fullfile(projectdir,'R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx');
 
-if remove_all_but_salp_and_salpfeces
-  odv_wfile = strrep(odv_wfile,'Taxonomic','TaxonomicLevel2_Salps');
-end
-% Define namespace YAML-formatted filename used to define non-conforming
-% Use the same namespace for both EXPORTSNP cruises RR1813 and
-% SR1812 because submitted at the same time... February 2021
-switch cruiseid
-%   case {'SR1812' 'RR1813'}
-%     namespace = 'EXPORTSNP_Ecotaxa';
-  otherwise
-    namespace = ['EXPORTS_' cruiseid];
-end
-
-% specify write file, this is not computer specific because uses same path
+%% Specify write filename
+% Release number R0 suggested if data_type=preliminary
+ % specify write file, this is not computer specific because uses same path
 % Write files to submit folder
-if ~isdir('submit')
-  mkdir('submit');
+submit_dir = fullfile(projectdir,'submit');
+if ~isdir(submit_dir)
+  try
+    mkdir(submit_dir);
+  catch
+    error('cannot create "submit" directory, maybe a permissions error?')
+  end
 end
-
 % Delete file if it is release R0 - i.e. preliminary
-if exist(fullfile('submit',odv_wfile),'file') && contains(odv_wfile,'R0')
-  delete(fullfile('submit',odv_wfile))
+if exist(fullfile(submit_dir,odv_wfile),'file') && contains(odv_wfile,'R0')
+  delete(fullfile(submit_dir,odv_wfile))
 else % rename if file already exists so don't overwrite
   release_num = 1;
-  while exist(fullfile('submit',odv_wfile),'file')
+  while exist(fullfile(submit_dir,odv_wfile),'file')
     odv_wfile =  strrep(odv_wfile,['R' num2str(release_num) '.sb'],['R' num2str(release_num+1) '.sb']);
     release_num = release_num + 1;
   end
 end
 
-% Store non-conforming terms that the OCB PTWG (Ocean Carbon and
-% Biogeochemistry Phytoplankton Taxonomy Working Group) created. Created to
-% define several standardized names for common terms that are not currently
-% defined by WoRMS or Algae Base.
-% The term ‘other’ should only be used to describe a non-living particle.
-ptwg = {'bad_image' 'bead' 'bubble' 'detritus' 'fecal_pellet' 'other'};
-our_term.badfocus = 'ptwg:bad_image';
-our_term.feces    = 'ptwg:fecal_pellet';
+%% Limit to specific classes
+if remove_all_but_salp_and_salpfeces
+  odv_wfile = strrep(odv_wfile,'TaxonomicLevel2','TaxonomicLevel2_Salps');
+end
+
+%% Read in basic metadata for project
+try
+  % Change directory to project folder so can easily call metadata file
+  pwd_now = pwd;
+  cd(projectdir)
+  eval(['hdr = ' cruiseid '_UVP_metadata'])
+  % Change directory back to previous working directory
+  cd(pwd_now);
+catch % catch and explain why script stopped
+  fprintf('Cannot load hdr for this project\n')
+  fprintf('Need to set up %s_UVP_metadata.m script, see example provided\n',cruiseid)
+  keyboard
+end
+% Test that hdr loaded
+if ~exist('hdr','var')
+  error('*** Need "hdr" structure - called from [cruiseid]_UVP_metadata.m')
+end
 
 %% Read ODV zoo data
 fprintf('\n  Reading ODV Zooplankton data from... %s\n',odv_rfile)
@@ -86,16 +96,16 @@ table_options = detectImportOptions(odv_rfile);
 % Read header
 % column names usually at line 7, but go to line 20 in case extra
 % header information is in file
-hdr = cell(20,1);
+hdr_odv = cell(20,1);
 fileID = fopen(odv_rfile);
 for nline = 1:20
-  hdr{nline} = fgetl(fileID);
+  hdr_odv{nline} = fgetl(fileID);
 end
 fclose(fileID);
-column_hdrline = find(contains(hdr,'Cruise'));
+column_hdrline = find(contains(hdr_odv,'Cruise'));
 % resize header
-hdr = hdr(1:column_hdrline);
-cols = strsplit(hdr{column_hdrline},table_options.Delimiter); % split hdr by odv delimiter
+hdr_odv = hdr_odv(1:column_hdrline);
+cols = strsplit(hdr_odv{column_hdrline},table_options.Delimiter); % split hdr_odv by odv delimiter
 % store original column names
 cols_orig = cols;
 for ic = 1:numel(cols)
@@ -306,13 +316,14 @@ catch % if older version of MATLAB
   % this will work for all versions of matlab but kept the above method for
   % clarity
   odv2 = odv2(:,new_order);
+  % delete redundant variables that result from reordering
+  odv2.date_1 = [];
+  odv2.time_1 = [];
 end
 % sort by datetime then remove the datetime column
 odv2.datetime     = [];
 cols2(i_datetime) = [];
-% delete redundant variables that result from reordering
-odv2.date_1 = [];
-odv2.time_1 = [];
+
 cols2(end-1:end) = []; % date and time at the end
 
 % Now move r2r event to just after depth
@@ -329,6 +340,7 @@ if ismember('R2R_Event',cols2)
   odv2.R2R_Event_1    = [];
   cols2(i_r2revent+1) = [];
 end
+
 
 %% Query WoRMS to pull out AphiaID match for each taxonomic name
 % save_taxa_filename = [cruiseid 'taxa_' date '.mat'];
@@ -348,7 +360,7 @@ if ~exist(save_taxa_filename,'file')
   %     taxa.Name_parent   = {};
   %     taxa.Name_original = {};
   taxa = table();
-  taxa.ID            = {}; % suffix added to abun_, biovol_, avgesd_ fields. This field is not required for WoRMS_AphiaID_taxa_match.m
+  taxa.ID            = {}; % suffix added to abun_zoop_, biovol_, avgesd_ fields. This field is not required for WoRMS_AphiaID_taxa_match.m
   taxa.Name          = {}; % taxa name, lowest level.        Required field in WoRMS_AphiaID_taxa_match.m.
   taxa.Name_parent   = {}; % taxa parent name, if available. Required field in WoRMS_AphiaID_taxa_match.m.
   taxa.Name_original = {}; % name of original variable.      This field is not required for WoRMS_AphiaID_taxa_match.m.
@@ -378,30 +390,6 @@ else % Load data instead of rerunning everything
   load(save_taxa_filename);
 end
 
-%% Non-conforming ROI's that need to be defined in a YAML-formatted namespace file
-% These IDs (e.g. in our case taxa.Name{n_id}) are paired with definitions
-% and are stored in a YAML  formatted file in order to serve as a
-% machine-readable configuration file for anyone working with the data
-% files.
-idx_not_living = find(strcmp(taxa.Name,'not-living'));
-for n_id = idx_not_living:size(taxa,1)
-  % print to screen formatted text to insert into YAML file
-  fprintf('  - id: %s\n',taxa.Name{n_id})
-  fprintf('    definition: \n');
-  % See if matches directly to OCB PTWG ids already defined
-  if ismember(taxa.Name{n_id},ptwg)
-    fprintf('    associated_terms: \n');
-    fprintf('    - id: %s\n',['ptwg:' taxa.Name{n_id}]);
-  elseif isfield(our_term,taxa.Name{n_id})
-    fprintf('    associated_terms: \n');
-    fprintf('    - id: %s\n',our_term.(taxa.Name{n_id}));
-  else
-    %fprintf('    associated_terms: \n');
-    %fprintf('    - id: \n');
-  end
-  taxa.scientificNameID{n_id} = [namespace ':' taxa.Name{n_id}];
-end
-
 %% Configure fieldnames to fit expected SeaBASS fields 
 %Correct some variable names to match with SEABASS requirements
 cols2 = strrep(cols2,'Site','station');
@@ -416,6 +404,7 @@ cols2 = strrep(cols2,'Depth_[m]','depth');  % depth = Depth of measurement
 cols2 = strrep(cols2,'Sampled_volume_[L]','volume');
 % Set up units
 units = cell(size(cols2));
+
 if ismember('R2R_Event',cols2)
   units(1:9) = {'none' 'none' 'yyyymmdd' 'hh:mm:ss' 'none' 'degrees' 'degrees' 'm' 'L'};
   descr(1:9) = {'Station' 'Profile name' 'Date' 'Time (UTC)' 'Rolling Deck to Repository (R2R) Unique sample event number' 'Latitude in decimal degrees north' 'Longitude in decimal degrees north' 'Depth, midpoint of 5m depth bin' 'Total volume of water sampled within each depth bin'};
@@ -423,18 +412,31 @@ else
   units(1:8) = {'none' 'none' 'yyyymmdd' 'hh:mm:ss' 'degrees' 'degrees' 'm' 'L'};
   descr(1:8) = {'Station' 'Profile name' 'Date' 'Time (UTC)' 'Latitude in decimal degrees north' 'Longitude in decimal degrees north' 'Depth, midpoint of 5m depth bin' 'Total volume of water sampled within each depth bin'};
 end
-
+% Notes about variable names from NASA
+%  I did a few modifications to the field names in the taxonomic file to
+%  adjust to our system who can only handle one type of unit per field.
+%  Abun was taken with cell/L units, so we created a new field call
+%  abun_zoop, same for biovol.
+% 
+% For the avgsed, we went with a long torturing one! The IFCB had set
+% equivalent_spherical_diameter for the level-1b in um units, so we created
+% yours as equivalent_spherical_diameter_avgmm.
+keyboard
 % Pull out abundance data [#/m^3]
 idx_abun = contains(cols2,'_[#/m^3]');
-cols2(idx_abun) = strcat('abun_',taxa.ID');  % Build variables as abun_1id,abun_2id... etc
-units(idx_abun) = {'number/m^3'};
+cols2(idx_abun) = strcat('abun_zoop_',taxa.ID');  % Build variables as abun_1id,abun_2id... etc
+units(idx_abun) = {'organisms/L'}; % NASA prefers 'organisms/L' to 'number/m^3'
+abun = table2array(odv2(:,idx_abun)); % first need to convert to an array so can use the * operator
+odv2(:,idx_abun) = array2table(abun./1000.0); % [µL/m^3]
 abun_desc = strcat('Abundance of',{' '},taxa.Name_original);
 descr(idx_abun) = abun_desc; %strcat(abun_desc,{' '},erase(cols2(idx_abun),'abundance_'));
-
+fprintf('NEED TO CONVERT number/m3 to organisms/L!!!!!\n')
+fprintf('Email sent to Inia/NASA about this issue on March 26, 2021\n')
+keyboard
 
 
 idx_biovol = contains(cols2,'_biovolume_[mm^3/L]');
-cols2(idx_biovol) = strcat('biovol_',taxa.ID');  % Build variables as abun_1id,abun_2id... etc
+cols2(idx_biovol) = strcat('biovol_zoop_',taxa.ID');  % Build variables as abun_1id,abun_2id... etc
 % units(idx_biovol) = {'mm^3/L'};
 % convert biovolume from [mm^3/L] to [µL/m^3] --> VSD * 1000.0; (1uL=1mm^3, 1000L=1m^3)
 units(idx_biovol) = {'uL/m^3'};
@@ -446,7 +448,7 @@ descr(idx_biovol) = biovol_desc; %strcat(biovol_desc,{' '},erase(cols2(idx_biovo
 
 % pull out esd data [mm]
 idx_esd = contains(cols2,'_avgesd_[mm]');
-cols2(idx_esd) = strcat('avgesd_',taxa.ID');  % Build variables as abun_1id,abun_2id... etc
+cols2(idx_esd) = strcat('equivalent_spherical_diameter_avgmm_',taxa.ID');  % Build variables as abun_1id,abun_2id... etc
 units(idx_esd) = {'mm'};
 esd_desc = strcat('Average equivalent spherical diameter of',{' '},taxa.Name_original);
 descr(idx_esd) = esd_desc; %strcat(esd_desc,{' '},erase(cols2(idx_esd),'biovolume_'));
@@ -456,37 +458,11 @@ colunits = strjoin(units,','); %[colstr,cols2{i},','];
 % Combine column names into a single string
 colstr = strjoin(cols2,','); % colstr=[colstr,cols2{i},','];
 
-%% Generate table that includes all variables with description, units, size bin, etc
-fields = table();
-fields.VariableName = cols2';
-fields.Units = units';
-fields.Description = descr';
-fields.Ecotaxa_original_name = repmat({''},size(fields.Units));
-fields.Ecotaxa_original_name(idx_abun)   = taxa.Name_original;
-fields.Ecotaxa_original_name(idx_biovol) = taxa.Name_original;
-fields.Ecotaxa_original_name(idx_esd)    = taxa.Name_original;
-
-% Add AphiaID
-fields.WoRMS_AphiaID        = repmat({''},size(fields.Units));
-fields.WoRMS_AphiaID_Parent = repmat({''},size(fields.Units));
-fields.scientificNameID     = repmat({''},size(fields.Units));
-fields.WoRMS_AphiaID(idx_abun)   = taxa.AphiaID;
-fields.WoRMS_AphiaID(idx_biovol) = taxa.AphiaID;
-fields.WoRMS_AphiaID(idx_esd)    = taxa.AphiaID;
-fields.WoRMS_AphiaID_Parent(idx_abun)   = taxa.AphiaID_parent;
-fields.WoRMS_AphiaID_Parent(idx_biovol) = taxa.AphiaID_parent;
-fields.WoRMS_AphiaID_Parent(idx_esd)    = taxa.AphiaID_parent;
-fields.scientificNameID(idx_abun)   = taxa.scientificNameID;
-fields.scientificNameID(idx_biovol) = taxa.scientificNameID;
-fields.scientificNameID(idx_esd)    = taxa.scientificNameID;
-% remove NULL entries to avoid confusion
-fields.WoRMS_AphiaID(strcmp(fields.WoRMS_AphiaID,'NULL')) = {''};
-fields.WoRMS_AphiaID_Parent(strcmp(fields.WoRMS_AphiaID_Parent,'NULL')) = {''};
-
-%% Write ParameterDescriptions table
-% writetable(fields,fullfile('submit',[cruiseid '_UVP_Taxonomic_ParameterDescriptions.xlsx']))
-
 %% Generate SeaBASS header text
+% Pull out raw filename
+[~,original_file,ext] = fileparts(odv_rfile);
+original_file = [original_file ext];
+
 % pull out max/min latitude, longitude, date, and time
 latmax = max(odv2.latitude);
 latmin = min(odv2.latitude);
@@ -501,19 +477,62 @@ datemin = odv2.date(1  ,:);
 timemax = odv2.time(end,:);
 timemin = odv2.time(1  ,:);
 
-% First - grab structure with basic metadata from SeaBASS_metadata
-[~,original_file,ext] = fileparts(odv_rfile);
-original_file = [original_file ext];
-hdr = SeaBASS_metadata_headers(cruiseid,original_file);
-
-% Write formatted header for sb file
-hdr_SEABASS = format_UVP_SeaBASS_metadata_header;
-if remove_all_but_salp_and_salpfeces
-  % Sally Ride
-  expert_image_val = '!  Expert image validation: Debbie Steinberg and Karen S. Stamieszkin'; 
-  idx_find = find(contains(hdr_SEABASS,'Image validation'));
-  hdr_SEABASS = [hdr_SEABASS(1:idx_find); expert_image_val; hdr_SEABASS(idx_find+1:end)];
-end
+hdr_SEABASS={'/begin_header';
+  ['/investigators='  hdr.investigators];
+  ['/affiliations='   hdr.affiliations];
+  ['/contact='        hdr.contact];
+  ['/experiment='     hdr.experiment];
+  ['/cruise='         hdr.cruise];
+  ['/station='        hdr.station];
+  ['/data_file_name=' odv_wfile];
+  ['/associated_files=' original_file]; % The original name of the data file exported from Ecotaxa
+  '/associated_file_types=raw';
+  ['/documents='      strjoin(hdr.documents.ZOO,',')];
+  ['/data_type='      hdr.data_type];
+  ['/data_status='    hdr.data_status.ZOO];
+  ['/start_date='     datemin];
+  ['/end_date='       datemax];
+  ['/start_time='     timemin '[GMT]'];
+  ['/end_time='       timemax '[GMT]'];
+  ['/north_latitude=' num2str(latmax) '[DEG]'];
+  ['/south_latitude=' num2str(latmin) '[DEG]'];
+  ['/east_longitude=' num2str(lonmax) '[DEG]'];
+  ['/west_longitude=' num2str(lonmin) '[DEG]'];
+  '/water_depth=NA';
+  ['/missing='        hdr.missing];
+  ['/delimiter='      hdr.delimiter];
+  ['/instrument_manufacturer='  hdr.inst_mfr];
+  ['/instrument_model='         hdr.inst_model];
+  ['/calibration_files='        hdr.calfiles];
+  ['/calibration_date='         hdr.caldates];
+  '!'};
+  if include_uncertainty_description
+  hdr.comments.ZOO = [hdr.comments.ZOO; ...
+    '!';...
+    '! Uncertainties can be calculated based on counting statistics';...
+    '! For example:' ;...
+    '!  relative uncertainty [none]';...
+    '!  relative_unc = sqrt(abun_zoop_id{#}*volume)/(abun_zoop_id{#}*volume)';
+    '!  uncertainty in the abundance [number/m^3]';...
+    '!  abun_zoop_id{#}_unc = relative_unc*abun_zoop_id{#}';
+    '!  uncertainty in the biovolume [mm^3/L]';...
+    '!  biovol_zoop_id{#}_unc = relative_unc*biovol_zoop_id{#}'];%...
+  %'!  uncertainty in the average equivalent spherical diameter [mm]';...
+  %'!  avgesd_id{#}_unc = ... not sure'};];
+  end
+  % Insert comments, then finish with /fields and /units
+  hdr_SEABASS = [hdr_SEABASS; hdr.comments.ZOO;...
+    '!';
+    ['/fields=' colstr];
+    ['/units=' colunits];
+    '/end_header'];
+  % check if there is whitespace in any metadata headers
+  % whitespace in comments is OKAY
+  if any(contains(hdr_SEABASS,' ') & ~contains(hdr_SEABASS,'!'))
+    fprintf('White space in metadata header, must remove to pass fcheck\n')
+    keyboard
+  end
+  
 
   %% Insert taxa definitions to comments
 % AphiaID returns NULL if no match found, so replace all NaNs with NULL
@@ -556,10 +575,10 @@ odv_write(cellfun(@(x) isnumeric(x) && isnan(x), odv_write)) = {-9999}; % missin
 fprintf('\n  Deleting data file, if it exist (if it does not exist, you may get a WARNING, but this is OK: %s\n',odv_wfile);
 eval(['delete ' odv_wfile])
 
-fprintf('\n  Writing data in ODV format to: %s\n',fullfile('submit',odv_wfile));
-fileID = fopen(fullfile('submit',odv_wfile),'w');  % open file
+fprintf('\n  Writing data in ODV format to: %s\n',fullfile(submit_dir,odv_wfile));
+fileID = fopen(fullfile(submit_dir,odv_wfile),'w');  % open file
 if fileID < 0
-  fprintf(' *** Error opening file %s\n',fullfile('submit',odv_wfile))
+  fprintf(' *** Error opening file %s\n',fullfile(submit_dir,odv_wfile))
   keyboard
 end
 fprintf(fileID,'%s\n',hdr_SEABASS{:});% write header
@@ -574,66 +593,7 @@ fprintf('workflow is finished\n')
 
 %% FUNCTION META = FORMAT_UVP_SEABASS_METADATA_HEADER
   function hdr_SEABASS = format_UVP_SeaBASS_metadata_header
-    % Needs hdr structure as defined in SeaBASS_metadata_headers
-    if ~exist('hdr','var')
-      error('Need "hdr" structure - called from SeaBASS_metadata_headers.m\n')
-    end
-    [~,original_file,ext] = fileparts(odv_rfile);
-    original_file = [original_file ext];
-    hdr_SEABASS={'/begin_header';
-      ['/investigators='  hdr.investigators];
-      ['/affiliations='   hdr.affiliations];
-      ['/contact='        hdr.contact];
-      ['/experiment='     hdr.experiment];
-      ['/cruise='         hdr.cruise];
-      ['/station='        hdr.station];
-      ['/data_file_name=' odv_wfile]; 
-      ['/original_file_name=' original_file]; % The original name of the data file, if different from the current /data_file_name. Designed to be a reference for the contributor.
-      ['/documents='    strcat(strjoin(hdr.documents,','), [',' namespace '.yaml'])];
-      ['/data_type='    hdr.data_type];
-      ['/data_status='  hdr.data_status];
-      ['/start_date='   datemin];
-      ['/end_date='     datemax];
-      ['/start_time='   timemin '[GMT]'];
-      ['/end_time='     timemax '[GMT]'];
-      ['/north_latitude=' num2str(latmax) '[DEG]'];
-      ['/south_latitude=' num2str(latmin) '[DEG]'];
-      ['/east_longitude=' num2str(lonmax) '[DEG]'];
-      ['/west_longitude=' num2str(lonmin) '[DEG]'];
-      '/water_depth=NA';
-      ['/missing='    hdr.missing];
-      ['/delimiter='  hdr.delimiter];
-      ['/instrument_manufacturer='  hdr.inst_mfr];
-      ['/instrument_model='         hdr.inst_model];
-      ['/calibration_files='        hdr.calfiles];
-      ['/calibration_date='         hdr.caldates];
-      '!';};
-    if include_uncertainty_description
-      hdr.comments = [hdr.comments; ...
-        '!';...
-        '! Uncertainties can be calculated based on counting statistics';...
-        '! For example:' ;...
-        '!  relative uncertainty [none]';...
-        '!  relative_unc = sqrt(abun_id{#}*volume)/(abun_id{#}*volume)';
-        '!  uncertainty in the abundance [number/m^3]';...
-        '!  abun_id{#}_unc = relative_unc*abun_id{#}';
-        '!  uncertainty in the biovolume [mm^3/L]';...
-        '!  biovol_id{#}_unc = relative_unc*biovol_id{#}'];%...
-        %'!  uncertainty in the average equivalent spherical diameter [mm]';...
-        %'!  avgesd_id{#}_unc = ... not sure'};];
-    end
-    % Insert comments, then finish with /fields and /units
-    hdr_SEABASS = [hdr_SEABASS; hdr.comments;...
-                  '!';
-                  ['/fields=' colstr];
-                  ['/units=' colunits];
-                  '/end_header'];
-    % check if there is whitespace in any metadata headers
-    % whitespace in comments is OKAY
-    if any(contains(hdr_SEABASS,' ') & ~contains(hdr_SEABASS,'!'))
-      fprintf('White space in metadata header, must remove to pass fcheck\n')
-      keyboard
-    end
+
   end %% FUNCTION META = FORMAT_UVP_SEABASS_METADATA_HEADER
 end %% MAIN FUNCTION
 

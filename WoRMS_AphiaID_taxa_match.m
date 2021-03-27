@@ -90,13 +90,8 @@ taxa.Comment          = cell(size(taxa.Name));
 if nargin == 3
   if ischar(data_provider)
     switch data_provider
+      
       case {'ecotaxa' 'Ecotaxa' 'ECOTAXA'} % match all cases if spelling is different
-        % IF the data provider is confident that the ROI is a living particle
-        % but cannot be identified to a specific taxonomic rank, then it should
-        % be classified to the rank of Eukaryota (see Subchapter 2.4.1 for an
-        % example).
-        living  = {'living' 'Eukaryota'};
-        %not_living = {'artefact' 'bubble' 'badfocus' 'fiber' 'detritus' 'fluffy' 'dark' 'light'};
         % Add special known cases
         special = struct();
         special.Teleostei_X    = 'Teleostei';    % Likely named as temporary field during manual Ecotaxa identification (EXPORTS SR1812 cruise)
@@ -105,15 +100,18 @@ if nargin == 3
         % special.Ctenophora_X = 'Ctenophora';  % Check with Rachel et al.
         % special.Ctenophora_XX = 'Ctenophora'; %
         % special.Ctenophora_sp. = 'Ctenophora';%
+        
+        % IF the data provider is confident that the ROI is a living particle
+        % but cannot be identified to a specific taxonomic rank, then it should
+        % be classified to the rank of Eukaryota (see Subchapter 2.4.1 for an
+        % example).
+        
       otherwise
         fprintf('data_provider has not been set to match parts to the parent yet\n')
     end
   else
     error('Expected data_provider to be a character string, e.g. "ecotaxa"')
   end
-else
-  living     = [];
-  %not_living = [];
 end
 
 %% STEP1 | Set up WoRMS webservice and create object

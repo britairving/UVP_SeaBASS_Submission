@@ -1,12 +1,12 @@
 function Write_SEABASS_Level1b_UVP_zoo
 %% FUNCTION WRITE_SEABASS_LEVEL1B_UVP_ZOO
 % Description:
-%   Reads in detailed ODV formatted file exported from Ecotaxa Particle
+%   Reads in detailed raw formatted file exported from Ecotaxa Particle
 %   Module and creates a file for submission to NASA's SEABASS database
 %   https://seabass.gsfc.nasa.gov/wiki/Data_Submission/
 %
 % Steps:
-%   1. Read in detailed ODV PAR file
+%   1. Read in detailed raw PAR file
 %   2. Format fields and column names following SeaBASS format
 %   3. Define metadata header that will be printed to .sb file
 %   4. Write sb file with DNSD and DVSD
@@ -16,10 +16,14 @@ function Write_SEABASS_Level1b_UVP_zoo
 %  Picheral M, Colin S, Irisson J-O (2017). EcoTaxa, a tool for the
 %  taxonomic classification of images. http://ecotaxa.obs-vlfr.fr.
 %
+%  OCB_PTWG_TM_FinalDraft_Dec2020.docx
+%
 %  https://seabass.gsfc.nasa.gov/wiki/plankton_and_particles
 %
+%  https://github.com/ecotaxa/ecotaxatoolbox/blob/master/UVPread_persample.m
+%
 %  level 1b definition: Individual level counts with automatic (including
-%  interpretation of class scores or probabilities) and manual
+%  interpretation of class scores or probabilities ) and manual
 %  classifications, and biovolume and size parameters for each region of
 %  interest (ROI). A ROI is defined as a rectangular subset of pixels in a
 %  given image. The submission of a Level 1b data table for plankton and
@@ -30,21 +34,30 @@ function Write_SEABASS_Level1b_UVP_zoo
 % Author:
 %  Brita Irving <bkirving@alaska.edu>
 %  Andrew McDonnell <amcdonnell@alaska.edu>
-%% Uncertainty description
-include_uncertainty_description = 1;
+%% Level 1b fieldnames
+cols = SeaBASS_define_taxonomic_Level1b_fields;
 
+fprintf('LOOK THROUGH https://github.com/ecotaxa/ecotaxatoolbox/blob/master/UVPread_persample.m\n')
+fprintf('CALCULATE NECESSARY VARIABLES...\n');
+keyboard
 %% Define read and write filenames
 %% EXPORTSNP survey cruise R/V Sally Ride
-% cruiseid = 'SR1812';
-% odv_rfile = 'D:\MATLAB\EXPORTS_UVP_SEABASS\export_detailed_20210201_19_26\export_detailed_20210201_19_26_ZOO_odv.txt';
-% odv_wfile = 'EXPORTS-EXPORTSNP_UVP5-Taxonomic_survey_20180814-20180909_R0.sb';
-% r2r_elog  = 'D:\MATLAB\EXPORTS_UVP_SEABASS\R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx';
-%% EXPORTSNP process cruise R/V Roger Revelle
-cruiseid = 'RR1813';
-odv_rfile = 'D:\MATLAB\EXPORTS_UVP_SEABASS\export_detailed_20210128_08_11\export_detailed_20210128_08_11_ZOO_odv.txt';
-odv_wfile = 'EXPORTS-EXPORTSNP_UVP5-Taxonomic_process_20180814-20180909_R0.sb';
-r2r_elog  = 'D:\MATLAB\EXPORTS_UVP_SEABASS\R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx';
+cruiseid = 'SR1812';
+ecotaxaf = 'ecotaxa_export_1591_20210119_0944'; % Folder name of ecotaxa exported RAW data
+projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 
+raw_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel1b_survey_20180814-20180909_R0.sb';
+
+%% EXPORTSNP process cruise R/V Roger Revelle
+% cruiseid = 'RR1813';
+% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
+% raw_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel1b_process_20180814-20180909_R0.sb';
+% r2r_elog  = fullfile(projectdir,'R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx');
+
+%% Build read filename based on project directory and exported ecotaxa name
+raw_rfile = fullfile(projectdir,ecotaxaf,[ecotaxaf '.tsv']);
+namespace = ['namespace_' cruiseid '.yaml'];
+%%
 % Define namespace YAML-formatted filename used to define non-conforming
 % Use the same namespace for both EXPORTSNP cruises RR1813 and
 % SR1812 because submitted at the same time... February 2021
@@ -55,204 +68,51 @@ switch cruiseid
     namespace = ['EXPORTS_' cruiseid];
 end
 
-% specify write file, this is not computer specific because uses same path
+%% Specify write filename
+% Release number R0 suggested if data_type=preliminary
+ % specify write file, this is not computer specific because uses same path
 % Write files to submit folder
-if ~isdir('submit')
-  mkdir('submit');
-end
-
-% Delete file if it is release R0 - i.e. preliminary
-if exist(fullfile('submit',odv_wfile),'file') && contains(odv_wfile,'R0')
-  delete(fullfile('submit',odv_wfile))
-else % rename if file already exists so don't overwrite
-  release_num = 1;
-  while exist(fullfile('submit',odv_wfile),'file')
-    odv_wfile =  strrep(odv_wfile,['R' num2str(release_num) '.sb'],['R' num2str(release_num+1) '.sb']);
-    release_num = release_num + 1;
+submit_dir = fullfile(projectdir,'submit');
+if ~isdir(submit_dir)
+  try
+    mkdir(submit_dir);
+  catch
+    error('cannot create "submit" directory, maybe a permissions error?')
   end
 end
 
-% Store non-conforming terms that the OCB PTWG (Ocean Carbon and
-% Biogeochemistry Phytoplankton Taxonomy Working Group) created. Created to
-% define several standardized names for common terms that are not currently
-% defined by WoRMS or Algae Base.
-% The term ‘other’ should only be used to describe a non-living particle.
-ptwg = {'bad_image' 'bead' 'bubble' 'detritus' 'fecal_pellet' 'other'};
-our_term.badfocus = 'ptwg:bad_image';
-our_term.feces    = 'ptwg:fecal_pellet';
-
-%% Read ODV zoo data
-fprintf('\n  Reading ODV Zooplankton data from... %s\n',odv_rfile)
-% check that file exists
-if ~exist(odv_rfile,'file')
-  fprintf('File does not exist - make sure path and name are correct: %s\n',odv_rfile)
-end
-% STEP1 - read header and table options
-% Get file options delimiter can be ';' or '\t' (tab)
-table_options = detectImportOptions(odv_rfile);
-% Read header
-% column names usually at line 7, but go to line 20 in case extra
-% header information is in file
-hdr = cell(20,1);
-fileID = fopen(odv_rfile);
-for nline = 1:20
-  hdr{nline} = fgetl(fileID);
-end
-fclose(fileID);
-column_hdrline = find(contains(hdr,'Cruise'));
-% resize header
-hdr = hdr(1:column_hdrline);
-cols = strsplit(hdr{column_hdrline},table_options.Delimiter); % split hdr by odv delimiter
-% store original column names
-cols_orig = cols;
-for ic = 1:numel(cols)
-  cols{ic} = strrep(cols{ic},' ','_');
-  cols{ic} = strrep(cols{ic},'__','_'); % clean up unnecessary underscores
-end
-
-% ecotaxa changed the format of the unit part of column names
-% this happend sometime in 2019 (I think)
-% old: [#/m3]     [ppm]
-% new: [# m-3]    [mm3 l-1]
-
-% For simplicity, change column names back to original format
-cols = strrep(cols,'_[#_m-3]','_[#/m^3]');
-cols = strrep(cols,'_[mm3_l-1]','_[mm^3/L]');
-
-%% Reformat variable names
-meta_idx = find(contains(cols,'METAVAR'));
-
-% remove unnecessary text from table column names
-remove_text_from_columns = {'_METAVAR_TEXT_40','_METAVAR_TEXT_20', '_METAVAR_TEXT_10', '__METAVAR_DOUBLE','__PRIMARYVAR_DOUBLE','_degrees_east','_degrees_north'};
-table_options.VariableNames = erase(table_options.VariableNames,remove_text_from_columns);
-% now remove unnecessary text from original column names
-remove_text_from_columns = strrep(remove_text_from_columns,'_',':');
-remove_text_from_columns = strrep(remove_text_from_columns,'::',':');
-cols = erase(cols,remove_text_from_columns);
-
-% make sure all variables read in correctly as number and not strings
-table_options.VariableTypes(meta_idx(end):end) = {'double'};
-table_options.VariableNames(1:meta_idx(end))   = lower(table_options.VariableNames(1:meta_idx(end)));
-table_options.VariableNames{contains(table_options.VariableNames,'yyyy_mm_ddhh_mm')} = 'datetime';
-table_options.VariableNames{contains(table_options.VariableNames,'station')} = 'profile';
-table_options.VariableNames{contains(table_options.VariableNames,'Depth_m')} = 'Depth';
-
-% STEP2 - read ODV particle data from file
-odv = readtable(odv_rfile,table_options);
-
-%% Read R2R eventlog
+%% Read in basic metadata for project
 try
-  r2r = readtable(r2r_elog,'FileType','spreadsheet');
-  % Initialize r2r event field
-  odv.R2R_Event = cell(size(odv.cruise));
-  %odv.r2r_cast  = cell(size(odv.cruise));
-  cols = [cols, 'R2R_Event'];
-  % Pull out r2r event based on matching event
-  switch cruiseid
-    case 'SR1812'
-      [rawfilenames,iu] = unique(odv.rawfilename);
-      % remove empty entry (necessary because odv format only has single
-      % entry per profile
-      if isempty(rawfilenames{1})
-        rawfilenames(1) = [];
-        iu(1) = [];
-      end
-      % pull out profiles from uvp data
-      profiles = erase(odv.profile(iu),{'ctd00' 'ctd0' 'ctd'});
-      % loop through profiles/rawfilenames and pull out r2revent
-      for nr = 1:numel(rawfilenames)
-        % math by UVP rawfilename, then station or cast
-        mtch = contains(r2r.Comment,rawfilenames{nr}) & ...
-          ( strcmp(strrep(r2r.Station,' ','_'),odv.site{iu(nr)}) | strcmp(r2r.Cast,profiles{nr}) );
-        if sum(mtch) == 1
-          odv.R2R_Event{iu(nr)} = r2r.R2R_Event{mtch};
-          %odv.r2r_cast{iu(nr)} = r2r.Cast{mtch};
-        else
-          fprintf('r2r event not found, stopping here\n')
-          keyboard
-        end
-      end
-    case 'RR1813'
-      [sites,iu] = unique(odv.site);
-      % remove empty entry (necessary because odv format only has single
-      % entry per profile
-      if isempty(sites{1})
-        sites(1) = [];
-        iu(1) = [];
-      end
-      % pull out profiles from uvp data
-      profiles1 = erase(odv.profile(iu),{'export00' 'export0' 'export'});
-      profiles2 = strcat('SIO_',pad(profiles1,3,'left','0'));
-      % loop through profiles/rawfilenames and pull out r2revent
-      for nr = 1:numel(sites)
-        sdate = sites{nr}(1:8);
-        % math by UVP rawfilename, then station or cast
-        mtch = contains(r2r.Event,sites{nr}) | contains(r2r.R2R_Event,sites{nr});
-        if sum(mtch) ~= 1
-          mtch = contains(r2r.Event,sdate) & contains(r2r.Instrument,'CTD911') & ( strcmp(r2r.Cast,profiles1{nr}) | strcmp(r2r.Cast,profiles2{nr}) );
-        end
-        if sum(mtch) ~= 1
-          % for most of the casts, r2r event log has casts as some
-          % combindation of SIO and sequential cast number.
-          mtch = contains(r2r.Event,sdate) & contains(r2r.Instrument,'CTD911') & contains(r2r.Cast,'SIO','IgnoreCase',true) & contains(r2r.Cast,profiles1{nr}) ;
-        end
-        % set r2r event
-        odv.R2R_Event{iu(nr)} = r2r.R2R_Event{mtch};
-        %odv.r2r_cast{iu(nr)}  = r2r.Cast{mtch};
-      end
-    otherwise
-      fprintf('R2R event log not match up yet, ignoring for now\n')
-      odv.R2R_Event = [];
-  end
-catch
-  fprintf('Could not read R2R event log file, ignoring for now\n')
+  % Change directory to project folder so can easily call metadata file
+  pwd_now = pwd;
+  cd(projectdir)
+  eval(['hdr = ' cruiseid '_UVP_metadata'])
+  % Change directory back to previous working directory
+  cd(pwd_now);
+catch % catch and explain why script stopped
+  fprintf('Cannot load hdr for this project\n')
+  fprintf('Need to set up %s_UVP_metadata.m script, see example provided\n',cruiseid)
+  keyboard
+end
+% Test that hdr loaded
+if ~exist('hdr','var')
+  error('*** Need "hdr" structure - called from [cruiseid]_UVP_metadata.m')
 end
 
-%% Define new table
-% this is just to preserve original data so any manipulations can be
-% tracked
-odv2  = odv;
-cols2 = cols;
-
-%% Fill empty meta variables
-% This is necessary because ODV format has multiple rows of data for each
-% profile but after the first row, all subsequent rows for that profile are
-% empty
-fnames = fieldnames(odv2);
-for iv = 1:numel(meta_idx)
-  vname = fnames{meta_idx(iv)};
-  odv2.(vname) = fillmissing(odv2.(vname),'previous');
-end % loop through meta variables
-
-% also fill out r2r event
-if ismember('R2R_Event',fnames)
-  % first, need to replace 0x0 double entries with ''
-  odv2.R2R_Event(cellfun('isempty', odv2.R2R_Event)) = {''};
-  odv2.R2R_Event = fillmissing(odv2.R2R_Event,'previous');
+%% Read raw zoo data
+fprintf('\n  Reading raw Zooplankton data from... %s\n',raw_rfile)
+% check that file exists
+if ~exist(raw_rfile,'file')
+  fprintf('File does not exist - make sure path and name are correct: %s\n',raw_rfile)
 end
+% read raw data from file
+raw = readtable(raw_rfile,'FileType','text');
 
-%   %% Identify all empty variables - i.e. no real values
-%   rm_fields = [];
-%   for irm = meta_idx(end)+1:size(odv2,2)
-%     nam = fnames{irm};
-%     if all(isnan(odv2.(nam)))
-%       rm_fields = [rm_fields; irm];
-%     elseif all(odv2.(nam) == 0)
-%       rm_fields = [rm_fields; irm];
-%     end
-%   end
-%
-%   %% Remove empty variables
-%   odv2(:,rm_fields) = [];
-%   cols2(rm_fields)  = [];
-
-%% Remove temporary fields
-% % Decided NOT to remove temporary fields based on email correspondence
-% with PIs.
-%temporary_fields = find(contains(cols2,'temporary'));
-%odv2(:,temporary_fields) = [];
-%cols2(temporary_fields)  = [];
-
+fields = fieldnames(raw);
+for f = 1:numel(fields)
+  fprintf('%s\n',fields{f});
+end
+keyboard
 %% Remove unwanted columns
 % define variables that we want to remove
 remove_fields = {'DataOwner' 'Cruise' 'Rawfilename' 'Instrument' 'SN' 'CTDrosette'};
@@ -305,20 +165,6 @@ odv2.date_1 = [];
 odv2.time_1 = [];
 cols2(end-1:end) = []; % date and time at the end
 
-% Now move r2r event to just after depth
-if ismember('R2R_Event',cols2)
-  ncols = numel(odv2.Properties.VariableNames);
-  % find index location of variables we want to reorder
-  i_r2revent = find(strcmp(odv2.Properties.VariableNames,'R2R_Event'));
-  i_time     = find(strcmp(odv2.Properties.VariableNames,'time'));
-  new_order  = [1:i_time i_r2revent i_time+1:ncols];
-  % Reorder cell array with full column names
-  cols2 = cols2(new_order); % replaced cols2=[cols2(1,1:dt-1) , cols2(1,d) , cols2(1,d+1) , cols2(1,dt+1:d-1) , cols2(1,d+2:end)];
-  odv2 = odv2(:,new_order);
-  % delete redundant variables that result from reordering
-  odv2.R2R_Event_1    = [];
-  cols2(i_r2revent+1) = [];
-end
 
 %% Query WoRMS to pull out AphiaID match for each taxonomic name
 % save_taxa_filename = [cruiseid 'taxa_' date '.mat'];
@@ -417,6 +263,7 @@ for n_id = idx_not_living:size(taxa,1)
   end
   taxa.scientificNameID{n_id} = [namespace ':' taxa.Name{n_id}];
 end
+keyboard
 
 %% Configure fieldnames to fit expected SeaBASS fields 
 %Correct some variable names to match with SEABASS requirements
@@ -446,8 +293,6 @@ cols2(idx_abun) = strcat('abun_',taxa.ID');  % Build variables as abun_1id,abun_
 units(idx_abun) = {'number/m^3'};
 abun_desc = strcat('Abundance of',{' '},taxa.Name_original);
 descr(idx_abun) = abun_desc; %strcat(abun_desc,{' '},erase(cols2(idx_abun),'abundance_'));
-
-
 
 idx_biovol = contains(cols2,'_biovolume_[mm^3/L]');
 cols2(idx_biovol) = strcat('biovol_',taxa.ID');  % Build variables as abun_1id,abun_2id... etc
@@ -500,7 +345,7 @@ fields.WoRMS_AphiaID(strcmp(fields.WoRMS_AphiaID,'NULL')) = {''};
 fields.WoRMS_AphiaID_Parent(strcmp(fields.WoRMS_AphiaID_Parent,'NULL')) = {''};
 
 %% Write ParameterDescriptions table
-writetable(fields,fullfile('submit','UVP_ZOO_ParameterDescriptions.xlsx'))
+%writetable(fields,fullfile('submit','UVP_ZOO_ParameterDescriptions.xlsx'))
 
 %% Generate SeaBASS header text
 % pull out max/min latitude, longitude, date, and time
@@ -518,7 +363,7 @@ timemax = odv2.time(end,:);
 timemin = odv2.time(1  ,:);
 
 % First - grab structure with basic metadata from SeaBASS_metadata
-[~,original_file,ext] = fileparts(odv_rfile);
+[~,original_file,ext] = fileparts(raw_rfile);
 original_file = [original_file ext];
 hdr = SeaBASS_metadata_headers(cruiseid,original_file);
 
@@ -556,28 +401,28 @@ fmt_dbl = repmat( '%f,', [1 (col_n - col_n_text)]);
 fmt_dbl(end) = []; fmt_dbl = [fmt_dbl '\n'];
 fmt = [fmt_txt fmt_dbl];
 % reformat odv2 table to temporary variable to enable simply write to file
-odv_write = table2cell(odv2); % convert to cell array to handle different variable types
-odv_write = odv_write';            % transpose because fprintf function prints data columnwise
+raw_write = table2cell(odv2); % convert to cell array to handle different variable types
+raw_write = raw_write';            % transpose because fprintf function prints data columnwise
 % convert NaNs to missing identifier
-% odv_write(cellfun(@(x) isnumeric(x) && isnan(x), odv_write)) = {''}; % convert NaNs to '' for ODV format
-odv_write(cellfun(@(x) isnumeric(x) && isnan(x), odv_write)) = {-9999}; % missing=-9999 SeaBASS required header field
+% raw_write(cellfun(@(x) isnumeric(x) && isnan(x), raw_write)) = {''}; % convert NaNs to '' for raw format
+raw_write(cellfun(@(x) isnumeric(x) && isnan(x), raw_write)) = {-9999}; % missing=-9999 SeaBASS required header field
 
-%% Write odv table to file
-fprintf('\n  Deleting data file, if it exist (if it does not exist, you may get a WARNING, but this is OK: %s\n',odv_wfile);
-eval(['delete ' odv_wfile])
+%% Write raw table to file
+fprintf('\n  Deleting data file, if it exist (if it does not exist, you may get a WARNING, but this is OK: %s\n',raw_wfile);
+eval(['delete ' raw_wfile])
 
-fprintf('\n  Writing data in ODV format to: %s\n',fullfile('submit',odv_wfile));
-fileID = fopen(fullfile('submit',odv_wfile),'w');  % open file
+fprintf('\n  Writing data in raw format to: %s\n',fullfile('submit',raw_wfile));
+fileID = fopen(fullfile('submit',raw_wfile),'w');  % open file
 if fileID < 0
-  fprintf(' *** Error opening file %s\n',fullfile('submit',odv_wfile))
+  fprintf(' *** Error opening file %s\n',fullfile('submit',raw_wfile))
   keyboard
 end
 fprintf(fileID,'%s\n',hdr_SEABASS{:});% write header
-fprintf(fileID,fmt,odv_write{:});     % write data
+fprintf(fileID,fmt,raw_write{:});     % write data
 fclose(fileID);                       % close file
 % To troubleshoot why not printing correctly, comment above and just print to screen
 %fprintf('%s\n',hdr_SEABASS{:}) % write header
-%fprintf(fmt,odv_write{:})      % write data
+%fprintf(fmt,raw_write{:})      % write data
 
 %% END OF MAIN FUNCTION - SUBFUNCTIONS BELOW
 fprintf('workflow is finished\n')
@@ -588,7 +433,7 @@ fprintf('workflow is finished\n')
     if ~exist('hdr','var')
       error('Need "hdr" structure - called from SeaBASS_metadata_headers.m\n')
     end
-    [~,original_file,ext] = fileparts(odv_rfile);
+    [~,original_file,ext] = fileparts(raw_rfile);
     original_file = [original_file ext];
     hdr_SEABASS={'/begin_header';
       ['/investigators='  hdr.investigators];
@@ -597,7 +442,7 @@ fprintf('workflow is finished\n')
       ['/experiment='     hdr.experiment];
       ['/cruise='         hdr.cruise];
       ['/station='        hdr.station];
-      ['/data_file_name=' odv_wfile]; 
+      ['/data_file_name=' raw_wfile]; 
       ['/original_file_name=' original_file]; % The original name of the data file, if different from the current /data_file_name. Designed to be a reference for the contributor.
       ['/documents='    strcat(strjoin(hdr.documents,','), [',' namespace '.yaml'])];
       ['/data_type='    hdr.data_type];
@@ -618,20 +463,6 @@ fprintf('workflow is finished\n')
       ['/calibration_files='        hdr.calfiles];
       ['/calibration_date='         hdr.caldates];
       '!';};
-    if include_uncertainty_description
-      hdr.comments = [hdr.comments; ...
-        '!';...
-        '! Uncertainties can be calculated based on counting statistics';...
-        '! For example:' ;...
-        '!  relative uncertainty [none]';...
-        '!  relative_unc = sqrt(abun_id{#}*volume)/(abun_id{#}*volume)';
-        '!  uncertainty in the abundance [number/m^3]';...
-        '!  abun_id{#}_unc = relative_unc*abun_id{#}';
-        '!  uncertainty in the biovolume [mm^3/L]';...
-        '!  biovol_id{#}_unc = relative_unc*biovol_id{#}'];%...
-        %'!  uncertainty in the average equivalent spherical diameter [mm]';...
-        %'!  avgesd_id{#}_unc = ... not sure'};];
-    end
     % Insert comments, then finish with /fields and /units
     hdr_SEABASS = [hdr_SEABASS; hdr.comments;...
                   '!';
