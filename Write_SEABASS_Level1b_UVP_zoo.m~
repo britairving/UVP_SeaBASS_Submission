@@ -53,7 +53,7 @@ cruiseid = 'SR1812';
 ecotaxaf = 'ecotaxa_export_1591_20210329_1704'; % 'ecotaxa_export_1591_20210119_0944';%'task_42058_export_1591_20210329_1704'; % Folder name of ecotaxa exported RAW data
 projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 
-raw_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel1b_Salps_survey_20180814-20180909_R0.sb';
+raw_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel1b_survey_20180814-20180909_R0.sb';
 
 %% EXPORTSNP process cruise R/V Roger Revelle
 % cruiseid = 'RR1813';
@@ -232,13 +232,10 @@ end
 % calculated using the eval function, where equations are defined in the
 % SeaBASS_define_taxonomic_Level1b_fields.m script.  This was done so
 % future users could easily see how variables are calculated.
-%
-% INITIALIZE
-uvp = struct(); % data structure for required/recommended/optional fields
-colstrns = {};  % cell array built with names, will be converted to char
-colunits = {};  % cell array built with units, will be converted to char
+uvp = struct();
+colstrns = {};
+colunits = {};  % 
 fmt      = '';  % format used to write data to file
-% LOOP THROUGH FIELDS DEFINED IN SeaBASS_define_taxonomic_Level1b_fields.m
 colnames = fieldnames(fields);
 for ncol = 1:numel(colnames)
   field = colnames{ncol};

@@ -316,31 +316,39 @@ else % Load data instead of rerunning everything
   load(save_taxa_filename);
 end
 
+
+%% Remove all except salp and salp pellets
+% if remove_all_but_salp_and_salpfeces
+%   % but need to make sure that we give similar IDs (e.g., for salp feces)
+%   % salps and salp pellets is fine with me as it was carefully checked by experts (Deb, Karen).
+%   % Perhaps in the meantime we submit a level 2 file only for salps and salp pellets?  That could be done rather quickly by using Brita's existing level 2 file and removing all non-salp fields.
+%   keep_taxa = {'Salpida' 't008'};
+%  
+%   % Pull out abundance data [#/m^3],biovolume data [mm^3/L], & esd data [mm]
+%   idx_taxa = find(contains(cols2,{'_[#/m^3]' '_biovolume_[mm^3/L]' '_avgesd_[mm]'}));
+%   
+%   idx_remove_taxa = ~contains(cols2(idx_taxa),keep_taxa); % do not include metadata columns
+%   idx_remove_taxa = idx_taxa(idx_remove_taxa);            % reindex to full size
+%   cols2(idx_remove_taxa)  = [];
+%   odv2(:,idx_remove_taxa) = [];
+% end
+
 %% Limit data to specific taxa as defined by cfg.limit_to_taxa
 % Cell array with taxonomic names selected by the user
 % For example:  cfg.limit_to_taxa = {'Salpida' 't008'};   
 % Used for EXPORTSNP UVP Dataset:  salps and salp pellets is fine with me
 % as it was carefully checked by experts (Deb, Karen).
+keyboard
 if isfield(cfg,'limit_to_taxa')
   idx_taxa = ismember(taxa.Name,cfg.limit_to_taxa);
   taxa = taxa(idx_taxa,:);
   % Pull out abundance data [#/m^3],biovolume data [mm^3/L], & esd data [mm]
   idx_taxa = find(contains(cols2,{'_[#/m^3]' '_biovolume_[mm^3/L]' '_avgesd_[mm]'}));
-  idx_remove_taxa = ~contains(cols2(idx_taxa),cfg.limit_to_taxa); % do not include metadata columns
-  idx_remove_taxa = idx_taxa(idx_remove_taxa);            % reindex to full size
-  cols2(idx_remove_taxa)  = [];
-  odv2(:,idx_remove_taxa) = [];
   
-  % Redo taxa ID, in case any were removed
-  % First step | parse taxonomic names from Ecotaxa fields
-  % Only need to look at abundance names, because column names are the same
-  % for biovolume and avgesd.
-  original_fields = cols2(contains(cols2,'[#/m^3]'));
-  original_fields = erase(original_fields,'_[#/m^3]');
-  for n_id = 1:numel(original_fields)
-    taxa.ID{n_id}   = [num2str(n_id) 'id'];
-  end
+  idx_odv = ismember(raw.child_name,cfg.limit_to_taxa);
+  raw = raw(idx_raw,:);
 end
+
 
 %% Configure fieldnames to fit expected SeaBASS fields 
 %Correct some variable names to match with SEABASS requirements

@@ -80,6 +80,7 @@ end
 
 % Define new fields in table
 taxa.AphiaID = cell(size(taxa.Name));
+taxa.scientificName   = cell(size(taxa.Name));
 if flag_parent_available
   taxa.AphiaID_parent = cell(size(taxa.Name));
 end
@@ -94,9 +95,10 @@ if nargin == 3
       case {'ecotaxa' 'Ecotaxa' 'ECOTAXA'} % match all cases if spelling is different
         % Add special known cases
         special = struct();
-        special.Teleostei_X    = 'Teleostei';    % Likely named as temporary field during manual Ecotaxa identification (EXPORTS SR1812 cruise)
-        special.Trachylina     = 'Trachylinae';  % Might be common misspelling in Ecotaxa
-        special.Globigerinacea = 'Globigerinina';
+        special.Teleostei     = 'Teleostei X';    % Likely named as temporary field during manual Ecotaxa identification (EXPORTS SR1812 cruise)
+        special.Trachylinae   = 'Trachylina';  % Might be common misspelling in Ecotaxa
+        special.Globigerinina = 'Globigerinacea';
+        special.Rhizaria      = {'Rhizaria X sp.' 'rhizaria like'};
         % special.Ctenophora_X = 'Ctenophora';  % Check with Rachel et al.
         % special.Ctenophora_XX = 'Ctenophora'; %
         % special.Ctenophora_sp. = 'Ctenophora';%
@@ -313,38 +315,56 @@ for n_id = 1:num_taxa
   end
 end %% LOOP THROUGH EACH ROW IN taxa TABLE
 
+
 %% STEP3 | Check known special cases
 % Add as necessary
-if exist('special','var')  
+if exist('special','var')
   fields = fieldnames(special);
+  % Loop through known taxa names
   for nspec = 1:numel(fields)
-    % First, find index in taxa table
     fname = fields{nspec};
-    idx_special = strcmp(taxa.Name,fname);
-    % Only replace if it hasn't been identified yet
-    if strcmp(taxa.AphiaID(idx_special),'NULL')
-      aphiaID = getAphiaID(obj,special.(fname),args.marine_only);
-      % Only replace if NULL (no match), or -999 (multiple) were not returned
-      if aphiaID > 0
-        taxa.AphiaID{idx_special} = num2str(aphiaID);
-        % Now check if special case is a parent anywherem and if so, set that
-        % AphiaID too.
-        idx_parent_too = strcmp(taxa.Name_parent,taxa.Name{idx_special});
-        if any(idx_parent_too)
-          % Also make sure it hasn't already been ID - do not overwrite.
-          if strcmp(taxa.AphiaID_parent(idx_parent_too),'NULL')
-            taxa.AphiaID_parent{idx_parent_too} = taxa.AphiaID{idx_special};
-          end
-        end % Set AphiaID_parent for special cases
-      end % Direct match found
-    end % AphiaID has not been matched yet
-  end % LOOP through special KNOWN cases
-end
-
+    correct_name = fields{nspec};
+    idx_correct  = strcmp(taxa.Name,correct_name);
+    % First, make sure it is a cell and not a char
+    if ischar(special.(fields{nspec}))
+      special.(fields{nspec}) = {special.(fields{nspec})};
+    end
+    % Loop through unknown taxa and match with the known name
+    for nn = 1:numel(special.(fields{nspec}))
+      special_name = special.(fields{nspec}){nn};
+      idx_special  = strcmp(taxa.Name,special_name);
+      
+      % Only replace if it hasn't been identified yet
+      if strcmp(taxa.AphiaID(idx_special),'NULL')
+        if ~strcmp(taxa.AphiaID{idx_correct},'NULL')
+          taxa.AphiaID(idx_special) = taxa.AphiaID(idx_correct);
+        else
+          aphiaID = getAphiaID(obj,correct_name,args.marine_only);
+          % Only replace if NULL (no match), or -999 (multiple) were not returned
+          if aphiaID > 0
+            taxa.AphiaID{idx_special} = num2str(aphiaID);
+            % Now check if special case is a parent anywhere, and if so, set that
+            % AphiaID too.
+            idx_parent_too = strcmp(taxa.Name_parent,taxa.Name{idx_special});
+            if any(idx_parent_too)
+              % Also make sure it hasn't already been ID - do not overwrite.
+              if strcmp(taxa.AphiaID_parent(idx_parent_too),'NULL')
+                taxa.AphiaID_parent{idx_parent_too} = taxa.AphiaID{idx_special};
+              end
+            end % Set AphiaID_parent for special cases
+          end % Direct match found
+        end % AphiaID has not been matched yet
+      end % MATCH DIRECTLY, IF POSSIBLE
+    end % LOOP through special KNOWN cases
+  end % LOOP THROUGH TAXA NAMES THAT HAVE APHIAID TO MATCH SPECIAL CASES
+end  % IF SPECIAL CASES EXIST
 %% STEP4 | Match unknown taxa to their parent
 % If parent is unknown, but still in the living categories, match to
 % Eukaryota as suggested in OCB manual. 
 idx_not_living = find(strcmp(taxa.Name,'not-living'));
+if isempty(idx_not_living)
+  idx_not_living = find(contains(taxa.Name_original,{'not-living' 'temporary'}));
+end
 for n_id = 1:num_taxa
   % First, check if AphiaID has already been matched
   if strcmp(taxa.AphiaID{n_id},'NULL')
@@ -362,13 +382,16 @@ for n_id = 1:num_taxa
       % Parent & child do not have a match but still living category
       % Match with Eukaryota
     elseif strcmp(taxa.AphiaID_parent{n_id},'NULL')
-      if isempty(idx_not_living) || (~isempty(idx_not_living) && n_id < idx_not_living)
+      if numel(idx_not_living) > 1 && ismember(n_id,idx_not_living)
+        continue
+      elseif isempty(idx_not_living) || (~isempty(idx_not_living) && n_id < min(idx_not_living))
         taxa.scientificNameID{n_id} = 'urn:lsid:algaebase.org:taxname:86701';
         taxa.Comment{n_id} = 'miscellaneous living --> Eukaryota';
       end
     end % IF parent has, or does not have, matched AphiaID
   end % IF AphiaID has already been matched
 end
+
 
 %% STEP5 | MANUALLY Check unmatch cases by searching children of parent
 if check_children_manual
@@ -457,6 +480,14 @@ for n_id = 1:num_taxa
   end
 end
 
+
+%% Now that IDs have been identified where possible, pull out the AphiaName
+for n_id = 1:num_taxa 
+  if ~strcmp(taxa.AphiaID{n_id},'NULL')
+    idnum = str2double(taxa.AphiaID{n_id});
+    taxa.scientificName  {n_id} = getAphiaNameByID(obj,idnum);    
+  end
+end
 %% STEP7 | Save 
 % save_filename = ['taxa_' date '.mat'];
 % fprintf('Saving taxa matches to %s\n',[pwd filesep save_filename])

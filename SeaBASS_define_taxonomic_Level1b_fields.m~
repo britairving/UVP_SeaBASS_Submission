@@ -3,18 +3,11 @@ function fields = SeaBASS_define_taxonomic_Level1b_fields
 % Description:
 %   Defines fieldnames for Level1b SeaBASS files. Data are not actually
 %   calculated in this script, just defined.
-%
-%   Each variable has either "rawfield" or "calculate" as a field. This was
-%   done so future users could easily see how variables are calculated and
-%   edit and/or add fields as necessary.
+%   Each variable has either "rawfield" or "calculate" as a field.
 %     "rawfield"  | field/column name from TSV file exported from Ecotaxa
 %     "calculate" | formula for calculation
-%
 %   For example: variable "lat"
-%      fields.lat.rawfield  = 'object_lat'; 
-%             would lead to | lat = raw.object_lat; 
-%      fields.lat.calculate = "str2double(raw.object_lat)";  
-%             would lead to | lat = eval(fields.lat.calculate);
+%      fields.lat.calculate = "str2double(raw.object_lat)";
 %
 % References:
 %
