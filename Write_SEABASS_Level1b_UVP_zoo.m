@@ -227,6 +227,38 @@ if cfg.write_yaml_file
   end
 end
 
+%% Pull in R2R event from Level2 file
+% Level2 files are formatted from the detailed ODV file exported from
+% Ecotaxa Particle Module. See Write_SEABASS_Level2_UVP_zoo.m and
+% associated [cruiseid]_UVP_R2R_merge.m script for specifics.
+submitted_files = dir(fullfile(submit_dir,'*.sb'));
+level2idx = find(contains({submitted_files.name},'TaxonomicLevel2'));
+if ~isempty(level2idx)
+  level2file = submitted_files(level2idx).name;
+  % Read in Level2 file
+  % readsb.m from https://seabass.gsfc.nasa.gov/wiki/seabass_tools
+  L2 = readsb(fullfile(submit_dir,level2file),'MakeStructure',true);
+  if isfield(L2,'r2r_event')
+    try %to match raw.sample_id to L2.station_alt_id (cast name equivalent)
+      % Initialize r2r_event in raw
+      raw.r2r_event = raw.sample_id; % values will be changed
+      % pull out unique casts
+      ucastname = unique(raw.sample_id);
+      for nc = 1:numel(ucastname)
+        idx_L2  = find(contains(L2.station_alt_id,ucastname{nc},'IgnoreCase',true));
+        if ~isempty(idx_L2)
+          r2r_event = L2.r2r_event(idx_L2(1));
+          idx_raw = contains(raw.sample_id,ucastname{nc},'IgnoreCase',true);
+          raw.r2r_event(idx_raw) = r2r_event;
+        end
+      end % Loop through unique casts
+    catch
+      % remove field so does not erroneously write sample_id as r2r_event
+      raw.r2r_event = [];
+    end
+  end % If R2R_EVENT is a field in the Level2 SeaBASS file
+end
+
 %% Build data structure, column names, column units, and formatting for file writting
 % Variables are either pulled in based on the "rawfield" field, or
 % calculated using the eval function, where equations are defined in the
@@ -241,32 +273,32 @@ fmt      = '';  % format used to write data to file
 % LOOP THROUGH FIELDS DEFINED IN SeaBASS_define_taxonomic_Level1b_fields.m
 colnames = fieldnames(fields);
 for ncol = 1:numel(colnames)
-  field = colnames{ncol};
+  fname = colnames{ncol};
   try
-    if isfield(fields.(field),'rawfield')
-      uvp.(field) = raw.(fields.(field).rawfield);
-      colstrns = [colstrns; field];
-      colunits = [colunits; fields.(field).units];
-      if iscell(uvp.(field))
+    if isfield(fields.(fname),'rawfield')
+      uvp.(fname) = raw.(fields.(fname).rawfield);
+      colstrns = [colstrns; fname];
+      colunits = [colunits; fields.(fname).units];
+      if iscell(uvp.(fname))
         fmt = [fmt '%s,'];
       else
         fmt = [fmt '%f,'];
       end
-    elseif isfield(fields.(field),'calculate')
-      fprintf(' calculating... %s = %s\n',field,fields.(field).calculate)
-      uvp.(field) = eval(fields.(field).calculate);
-      colstrns = [colstrns; field];
-      colunits = [colunits; fields.(field).units];
-      if iscell(uvp.(field))
+    elseif isfield(fields.(fname),'calculate')
+      fprintf(' calculating... %s = %s\n',fname,fields.(fname).calculate)
+      uvp.(fname) = eval(fields.(fname).calculate);
+      colstrns = [colstrns; fname];
+      colunits = [colunits; fields.(fname).units];
+      if iscell(uvp.(fname))
         fmt = [fmt '%s,'];
       else
         fmt = [fmt '%f,'];
       end
     else
-      fprintf('unknown case...%s\n',field)
+      fprintf('unknown case...%s\n',fname)
     end
   catch
-    fprintf(' skipping "%s" for now...\n',field)
+    fprintf(' skipping "%s" for now...\n',fname)
     %keyboard
   end
 end
@@ -301,7 +333,7 @@ timemax = uvp.time{imax};
 timemin = uvp.time{imin};
 
 volume_sampled_ml = num2str(str2double(raw.acq_volimage{1})/1000);  % Convert from L to mL
-pixel_per_um      = raw.process_pixel{1}; % already in micrometer
+pixel_per_um      = raw.process_pixel{1};                           % already in micrometer
 
 hdr_SEABASS={'/begin_header';
   ['/investigators='  hdr.investigators];

@@ -85,6 +85,12 @@ fields.time.requirement = 'optional';
 fields.time.units       = 'hh:mm:ss'; 
 fields.time.calculate   = "insertAfter(insertAfter(raw.object_time,2,':'),5,':')"; % Convert from hhmmss to hh:mm:ss
 
+fields.R2R_Event.description = 'Rolling Deck to Repository (R2R) Unique sample event number';
+fields.R2R_Event.requirement = 'optional'; 
+fields.R2R_Event.units       = 'none'; 
+fields.R2R_Event.rawfield    = 'r2r_event';
+
+
 fields.associatedMedia.description = 'A unique persistent identifier of the media associated with the occurrence. The field provides the unique imagery file name corresponding to the source of the ROI. Alternately, use this field to provide a URL pointing to a permanent landing page for the ROI image. In the latter case, instructions should be provided as comments in the header on how to construct the local file name based on the URL. If the local imagery file name cannot be constructed from the URL, then list both filenames. Use the pipe character ?|? to separate the names, and do not use spaces.';
 fields.associatedMedia.requirement = 'required';
 fields.associatedMedia.units       = 'none';
