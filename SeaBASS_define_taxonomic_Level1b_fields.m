@@ -48,27 +48,26 @@ fields.station.requirement = 'optional'; %
 fields.station.units       = 'none'; 
 fields.station.rawfield    = 'sample_stationid';
 
-fields.station_alt_id.description = 'Alternate sample station identifier (use ONLY if station has already been used as a field name)';
-fields.station_alt_id.requirement = 'optional'; %
-fields.station_alt_id.units       = 'none'; 
-fields.station_alt_id.rawfield    = 'sample_id';
-
 fields.eventID.description = 'A unique identifier associated with the sample as an event';
 fields.eventID.requirement = 'optional'; %
 fields.eventID.units       = 'none'; 
 fields.eventID.rawfield    = 'sample_id'; % This is the same as station_alt_id in the Level2 ZOO file
+
+fields.station_alt_id.description = 'Alternate sample station identifier (use ONLY if station has already been used as a field name)';
+fields.station_alt_id.requirement = 'optional';
+fields.station_alt_id.units       = 'none';
+fields.station_alt_id.rawfield    = 'sample_profileid'; % e.g. hdr20180811192455
 
 % Fields not listed in SeaBASS wiki on plankton_and_particles (see
 % comments) but important to note
 fields.depth.description = 'Depth of measurement';
 fields.depth.requirement = 'optional'; %
 fields.depth.units       = 'm'; 
-fields.depth.rawfield    = 'object_depth_min';
-
+fields.depth.calculate   = 'raw.object_depth_min+1.2'; % Note that there is a 1.2 m difference in the depth between the two bases (depth transmitted to ecotaxa images is the depth recorded by the sensor which is 1.2m above the imaged zone /// ecotaxa particles does this correction but not the image module)
 fields.lat.description = 'Sample latitude (decimal fractions; -90 to 90)';
 fields.lat.requirement = 'optional'; %
 fields.lat.units       = 'degrees'; 
-fields.lat.calculate   = "str2double(raw.object_lat)";
+fields.lat.calculate   = "str2double(raw.object_lat)"; %
 
 fields.lon.description = 'Sample longitude (decimal fractions; -180 to 180)';
 fields.lon.requirement = 'optional'; %
@@ -96,37 +95,56 @@ fields.associatedMedia.requirement = 'required';
 fields.associatedMedia.units       = 'none';
 fields.associatedMedia.rawfield    = 'img_file_name'; % e.g. images/Annelida/106749790_0.jpg - path to the image
 
+fields.associatedMedia_source.description = 'a unique persistent URL pointing to the landing page for a water sample from which multiple ROIs are derived';
+fields.associatedMedia_source.requirement = 'optional';
+fields.associatedMedia_source.units       = 'none';
+fields.associatedMedia_source.rawfield    = 'object_rawvig'; % 
+
+% From Dr. Aimee Neeley
+% I think Brita has the right idea generally. I would suggest she put
+% Aulatractus in the data_provider_category_manual and then Aulosphaeridae
+% the ScientificName and ScientificNameID. The ScientificName and
+% ScientificNameID should match which is why I would not suggest putting
+% Aulatractus as a ScientificName when there isn?t an appropriate AphiaID
+% and, therefore, an appropriate LSID.
+% I would label them this way:
+% data_provider_category_manual = 'Aulatractus'
+% scientificName_automated      = 'Aulosphaeridae'
+% scientificNameID_automated    = 'urn:lsid:marinespecies.org:taxname:367360'
+% scientificName_manual         = 'Aulosphaeridae'
+% scientificNameID_manual       = 'urn:lsid:marinespecies.org:taxname:367360'
 fields.data_provider_category_manual.description = 'A category used by the data provider to name the organism or particle for a manual identification, not necessarily a scientific name.';
 fields.data_provider_category_manual.requirement = 'optional'; % (recommended but optional) 
 fields.data_provider_category_manual.units       = 'none';
-fields.data_provider_category_manual.rawfield    = 'object_annotation_hierarchy'; % e.g. 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
+fields.data_provider_category_manual.rawfield    = 'object_annotation_category';  % e.g. 'Annelida' from object_annotation_hierarchy = 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
 
 fields.data_provider_category_automated.description = 'A category used by the data provider to name the organism or particle for an automated classification, not necessarily a scientific name (e.g., pennate or detritus).';
 fields.data_provider_category_automated.requirement = 'optional'; % (recommended but optional) 
 fields.data_provider_category_automated.units       = 'none';
-fields.data_provider_category_automated.rawfield    = 'child_name';               % e.g. 'Annelida'
+fields.data_provider_category_automated.rawfield    = 'object_annotation_hierarchy'; % e.g. 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
 
-% I think the 'ScientificName[ID]_automated' and
-% 'ScientificName[ID]_manual' fields are the same in our case...
+% The scientificName/scientificNameID pairs can be determined manually by
+% searching WoRMS or automatically using web services with a script or with
+% the WoRMS Taxon Match Graphical User Interface (GUI) .
 fields.scientificName_automated.description = 'A scientific name from a recognized taxonomic reference database (e.g., WoRMS, AlgaeBase) at the lowest level that matches the data providers category for an automated classification paired to a scientificNameID. Generally, the ROI corresponds to an occurrence assigned to a single taxonomic name.'; 
 fields.scientificName_automated.requirement = 'optional'; % (recommended but optional) 
 fields.scientificName_automated.units       = 'none';
-fields.scientificName_automated.rawfield    = '';         % Not sure about this....
+fields.scientificName_automated.rawfield    = 'scientificName';     % Not sure about this....
 
 fields.scientificNameID_automated.description = 'A life science identifier (LSID) from a recognized taxonomic reference database (e.g., WoRMS, AlgaeBase) at the lowest level that matches the data provider?s category for an automated classification. e.g., urn:lsid:marinespecies.org:taxname:233015 where "urn:lsid" indicates the ID that is specific to life science data and is used for all files, marinespecies.org is the url for the reference database WoRMS, and the namespace ?taxname? informs the user that the following number represents a unique numerical identifier or taxon identifier in WoRMS. 233015 represents the taxon identifier (AphiaID) in WoRMS for the dinoflagellate species Karenia brevis.';
 fields.scientificNameID_automated.requirement = 'required'; 
 fields.scientificNameID_automated.units       = 'none';
-fields.scientificNameID_automated.rawfield    = '';       % Not sure about this....
+fields.scientificNameID_automated.rawfield    = 'scientificNameID'; % Not sure about this....
 
-fields.scientificName_manual.description = 'A scientific name from a recognized taxonomic reference database (e.g., World Register of Marine Species, AlgaeBase) at the lowest level that matches the data providers category, for a manual identification matched to scientificNameID. Generally, the ROI corresponds to an occurrence assigned to a single taxonomic name.';
-fields.scientificName_manual.requirement = 'optional'; % (recommended but optional) 
-fields.scientificName_manual.units       = 'none';
-fields.scientificName_manual.rawfield    = 'scientificName';
-
-fields.scientificNameID_manual.description = 'An LSID from a recognized taxonomic reference database (e.g., World Register of Marine Species, AlgaeBase) at the lowest level that matches the data providers category for a manual identification.';
-fields.scientificNameID_manual.requirement = 'required'; %
-fields.scientificNameID_manual.units       = 'none';
-fields.scientificNameID_manual.rawfield    = 'scientificNameID';
+% fields.scientificName_manual.description = 'A scientific name from a recognized taxonomic reference database (e.g., World Register of Marine Species, AlgaeBase) at the lowest level that matches the data providers category, for a manual identification matched to scientificNameID. Generally, the ROI corresponds to an occurrence assigned to a single taxonomic name.';
+% fields.scientificName_manual.requirement = 'optional'; % (recommended but optional) 
+% fields.scientificName_manual.units       = 'none';
+% fields.scientificName_manual.rawfield    = 'scientificName';
+% 
+% fields.scientificNameID_manual.description = 'An LSID from a recognized taxonomic reference database (e.g., World Register of Marine Species, AlgaeBase) at the lowest level that matches the data providers category for a manual identification.';
+% fields.scientificNameID_manual.requirement = 'required'; %
+% fields.scientificNameID_manual.units       = 'none';
+% fields.scientificNameID_manual.rawfield    = 'scientificNameID';
 
 fields.area_cross_section.description = 'Cross-sectional area of the target detected within the ROI determined by means specified in the image processing method or protocol document.';
 fields.area_cross_section.requirement = 'required'; %
@@ -146,16 +164,18 @@ fields.width_representation.calculate   = "raw.object_minor .* str2double(raw.pr
 fields.equivalent_spherical_diameter.description = 'Equivalent spherical diameter of the target detected within the ROI determined by means specified in the image processing method or protocol document.';
 fields.equivalent_spherical_diameter.requirement = 'optional'; %
 fields.equivalent_spherical_diameter.units       = 'um'; 
-fields.equivalent_spherical_diameter.calculate    = "raw.object_esd .* str2double(raw.process_pixel)"; % object_esd(!!!assuming this is equivalent spherical diameter in pixels!!!)*process_pixel(pixel size in ?m)
+fields.equivalent_spherical_diameter.calculate   = "raw.object_esd .* str2double(raw.process_pixel)"; % object_esd(!!!assuming this is equivalent spherical diameter in pixels!!!)*process_pixel(pixel size in ?m)
 
-fields.area_based_diameter.description = 'Area-based diameter of the target detected within the ROI determined by means specified in the image processing method or protocol document.';      
-fields.area_based_diameter.requirement = 'optional'; %
-fields.area_based_diameter.units       = 'um'; 
-fields.area_based_diameter.calculate   = "2 .* sqrt(uvp.area_cross_section ./ pi)"; % double the radius, where radius = sqrt(area/pi)
+% fields.area_based_diameter.description = 'Area-based diameter of the target detected within the ROI determined by means specified in the image processing method or protocol document.';      
+% fields.area_based_diameter.requirement = 'optional'; %
+% fields.area_based_diameter.units       = 'um'; 
+% fields.area_based_diameter.calculate   = "2 .* sqrt(uvp.area_cross_section ./ pi)"; % double the radius, where radius = sqrt(area/pi)
 
 fields.biovolume.description = 'Biovolume for the target detected within the ROI determined by means specified in the biovolume calculation method or protocol document.';
 fields.biovolume.requirement = 'required'; %
 fields.biovolume.units       = 'um^3';  
+fields.biovolume.calculate   = '(pi/6).*uvp.length_representation.*uvp.width_representation.^2'; % Let's calculate biovolume for each ROI by using major and minor axis dimensions from Ecotaxa (object_major, object_minor) and assuming they are prolate spheroids.  In that case, biovolume=(pi/6)*object_major*object_minor^2.
+
 % fields.biovolume.calculate   = "4/3 .* pi .* uvp.area_based_diameter.^3";           % Need to figure this out!!!
 % fields.biovolume.calculate   = "raw.object_circ_.^3 ./ (6*pi^2)";
 % fields.biovolume.calculate   = "4/3 .* pi .* uvp.equivalent_spherical_diameter.^3"; % Need to figure this out

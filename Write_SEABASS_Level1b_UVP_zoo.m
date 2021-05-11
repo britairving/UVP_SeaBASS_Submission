@@ -116,6 +116,7 @@ end
 % read raw data from file
 raw = readtable(raw_rfile,'FileType','text');
 
+
 %% Pull out unique taxa
 % This is necessary to query WoRMS and get the ScientificName and
 % ScientficNameID 
@@ -195,7 +196,7 @@ end
 % anyone working with the data files.
 if cfg.write_yaml_file
   % open file to write
-  fid = fopen(fullfile(projectdir,[namespace '.yaml']),'w');
+  fid = fopen(fullfile(projectdir,[namespace '.yml']),'w');
   idx_nonconforming = find(contains(raw.scientificNameID,'namespace'));
   [IDs,iu] = unique(raw.scientificNameID(idx_nonconforming));
   iu = idx_nonconforming(iu);
@@ -311,6 +312,11 @@ colstr = strjoin(colstrns,',');
 fmt(end) = [];
 % add newline character at the end
 fmt = [fmt '\n'];
+
+
+%% Build filename for assessed IDs
+assessed_id_file = ['Assessed_id_list_' cruiseid '.csv'];
+
 %% Generate SeaBASS header text
 % Pull out raw filename
 [~,original_file,ext] = fileparts(raw_rfile);
@@ -356,15 +362,18 @@ hdr_SEABASS={'/begin_header';
   ['/south_latitude=' num2str(latmin) '[DEG]'];
   ['/east_longitude=' num2str(lonmax) '[DEG]'];
   ['/west_longitude=' num2str(lonmin) '[DEG]'];
-  '/water_depth=NA';
   ['/missing='        hdr.missing];
   ['/delimiter='      hdr.delimiter];
   ['/instrument_manufacturer='  hdr.inst_mfr];
   ['/instrument_model='         hdr.inst_model];
   ['/calibration_files='        hdr.calfiles];
   ['/calibration_date='         hdr.caldates];...
+  ['/associated_files=images,'  assessed_id_file ',' original_file];...
+  '/associated_file_types=planktonic,Assessed_IDs_list,raw';...
   ['/volume_sampled_ml=' volume_sampled_ml];...
   ['/pixel_per_um='      pixel_per_um];...
+  'length_representation_instrument_varname=object_major*process_pixel';... % length_representation_instrument_varname (um): the instrument?s variable name equivalent to ?length_representation? (e.g., maxFeretDiameter).  
+  'width_representation_instrument_varname=object_minor*process_pixel';...  % width_representation_instrument_varname (um): the instrument?s variable name equivalent to ?width_representation? (e.g., minFeretDiameter).   
   '!'};
 
 % Insert comments, then finish with /fields and /units
@@ -406,6 +415,17 @@ fclose(fileID);                       % close file
 % To troubleshoot why not printing correctly, comment above and just print to screen
 fprintf('%s\n',hdr_SEABASS{:}) % write header
 fprintf(fmt,raw_write{:})      % write data
+
+%% List of assessed IDs for automated and/or manual classification 
+assessed = struct();
+[~,idx_unique] = unique(uvp.data_provider_category_manual,'stable');
+assessed.data_provider_category_manual    = uvp.data_provider_category_manual(idx_unique);
+assessed.data_provider_category_automated = uvp.data_provider_category_automated(idx_unique);
+assessed.scientificName_automated   = uvp.scientificName_automated(idx_unique);
+assessed.scientificNameID_automated = uvp.scientificNameID_automated(idx_unique);
+
+assessed = struct2table(assessed);
+writetable(assessed,fullfile(projectdir,assessed_id_file),'Delimiter',',');
 
 %% END OF MAIN FUNCTION - SUBFUNCTIONS BELOW
 fprintf('workflow is finished\n')
