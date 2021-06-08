@@ -181,10 +181,12 @@ fields.biovolume.calculate   = '(pi/6).*uvp.length_representation.*uvp.width_rep
 % fields.biovolume.calculate   = "4/3 .* pi .* uvp.equivalent_spherical_diameter.^3"; % Need to figure this out
 
 % Below are Required in the file header or as a field
-fields.volume_imaged_ml.description = 'Subset of volume_sampled_ml that was imaged in units of milliliters';
-fields.volume_imaged_ml.requirement = 'required'; %
-fields.volume_imaged_ml.units       = 'ml'; 
-fields.volume_imaged_ml.calculate   = "uvp.volume_sampled_ml"; 
+% For the UVP put volume_imaged_ml and volume_sampled_ml in header because
+% they are the same
+% fields.volume_imaged_ml.description = 'Subset of volume_sampled_ml that was imaged in units of milliliters';
+% fields.volume_imaged_ml.requirement = 'required'; %
+% fields.volume_imaged_ml.units       = 'ml'; 
+% fields.volume_imaged_ml.calculate   = "uvp.volume_sampled_ml"; 
 
 % % These should always be the same, so just put in metadata headers
 % fields.acq_volimage.description = 'Original volume of sample collected in units of milliliters';

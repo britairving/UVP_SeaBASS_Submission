@@ -87,7 +87,7 @@ end
 taxa.scientificNameID = cell(size(taxa.Name));
 taxa.Comment          = cell(size(taxa.Name));
 
-%% Define common/known issues related to specific data_provider
+%% STEP1 | Define common/known issues related to specific data_provider
 if nargin == 3
   if ischar(data_provider)
     switch data_provider
@@ -99,9 +99,7 @@ if nargin == 3
         special.Trachylinae   = 'Trachylina';  % Might be common misspelling in Ecotaxa
         special.Globigerinina = 'Globigerinacea';
         special.Rhizaria      = {'Rhizaria X sp.' 'rhizaria like'};
-        % special.Ctenophora_X = 'Ctenophora';  % Check with Rachel et al.
-        % special.Ctenophora_XX = 'Ctenophora'; %
-        % special.Ctenophora_sp. = 'Ctenophora';%
+        special.Ctenophora    = {'Ctenophora_X' 'Ctenophora_XX' 'Ctenophora_sp.'};
         
         % IF the data provider is confident that the ROI is a living particle
         % but cannot be identified to a specific taxonomic rank, then it should
@@ -116,7 +114,7 @@ if nargin == 3
   end
 end
 
-%% STEP1 | Set up WoRMS webservice and create object
+%% STEP2 | Set up WoRMS webservice and create object
 % Follows instructions for WoRMS webservice for Matlab
 %   <http://www.marinespecies.org/aphia.php?p=webservice&type=matlab>
 %
@@ -147,7 +145,7 @@ end
 % Step 4: in Matlab: create an object of the class:
 obj = AphiaNameService;
 
-%% STEP2 | Query AphiaID and parent AphiaID
+%% STEP3 | Query AphiaID and parent AphiaID
 num_taxa = size(taxa,1);
 % Loop through all taxonomic names to find AphiaID
 for n_id = 1:num_taxa
@@ -315,8 +313,7 @@ for n_id = 1:num_taxa
   end
 end %% LOOP THROUGH EACH ROW IN taxa TABLE
 
-
-%% STEP3 | Check known special cases
+%% STEP4 | Check known special cases
 % Add as necessary
 if exist('special','var')
   fields = fieldnames(special);
@@ -325,6 +322,9 @@ if exist('special','var')
     fname = fields{nspec};
     correct_name = fields{nspec};
     idx_correct  = strcmp(taxa.Name,correct_name);
+    if all(idx_correct == 0)
+      continue
+    end
     % First, make sure it is a cell and not a char
     if ischar(special.(fields{nspec}))
       special.(fields{nspec}) = {special.(fields{nspec})};
@@ -358,7 +358,8 @@ if exist('special','var')
     end % LOOP through special KNOWN cases
   end % LOOP THROUGH TAXA NAMES THAT HAVE APHIAID TO MATCH SPECIAL CASES
 end  % IF SPECIAL CASES EXIST
-%% STEP4 | Match unknown taxa to their parent
+
+%% STEP5 | Match unknown taxa to their parent
 % If parent is unknown, but still in the living categories, match to
 % Eukaryota as suggested in OCB manual. 
 idx_not_living = find(strcmp(taxa.Name,'not-living'));
@@ -392,8 +393,7 @@ for n_id = 1:num_taxa
   end % IF AphiaID has already been matched
 end
 
-
-%% STEP5 | MANUALLY Check unmatch cases by searching children of parent
+%% STEP6 | MANUALLY Check unmatch cases by searching children of parent
 if check_children_manual
   % For each given scientific name (may include authority), try to find one
   % or more AphiaRecords, using the TAXAMATCH fuzzy matching algorithm by
@@ -450,7 +450,7 @@ if check_children_manual
   end % LOOP through taxa to try and match difficult cases
 end % IF check_children_manual
 
-%% STEP6 | Note all unmatched/non-conforming names in ScientificName [custom_namespace]
+%% STEP7 | Note all unmatched/non-conforming names in ScientificName [custom_namespace]
 % The custom_namepsace is used to facilitate identification of
 % non-conforming ROIs, custom definitions not found in a taxonomic
 % authority must be provided in an external document file.
@@ -480,15 +480,47 @@ for n_id = 1:num_taxa
   end
 end
 
-
-%% Now that IDs have been identified where possible, pull out the AphiaName
+%% STEP8 | Now that IDs have been identified where possible, pull out the AphiaName
 for n_id = 1:num_taxa 
   if ~strcmp(taxa.AphiaID{n_id},'NULL')
     idnum = str2double(taxa.AphiaID{n_id});
-    taxa.scientificName  {n_id} = getAphiaNameByID(obj,idnum);    
+    taxa.scientificName{n_id} = getAphiaNameByID(obj,idnum);    
   end
 end
-%% STEP7 | Save 
+
+%% STEP9 | Search through all NULL living cases based on closest match in hierachy
+if strcmp(data_provider,'ecotaxa')
+  % ecotaxa will have "Name_original" field with family tree separated by >
+  % For example....
+  % Name_original=living>Eukaryota>Harosa>Rhizaria>Rhizaria X>RhizariaX sp.
+  for n_id = 1:num_taxa
+    if ismember(n_id,idx_not_living)
+      continue
+    end
+    % If is living, but still has not been identified... search through
+    % family tree and find match
+    if strcmp(taxa.AphiaID{n_id},'NULL') && strcmp(taxa.AphiaID_parent{n_id},'NULL')
+      family = strsplit(taxa.Name_original{n_id},'>');
+      family = fliplr(family); % search from lowest level
+      for nhierachy = 1:numel(family)
+        family_name = family{nhierachy};
+        if any(strcmp(taxa.scientificName,family_name))
+          idx_match = find(strcmp(taxa.scientificName,family_name));
+          if numel(idx_match) > 1
+            idx_match = idx_match(1);
+          end
+          taxa.AphiaID(n_id) = taxa.AphiaID(idx_match);
+          taxa.scientificName(n_id)   = taxa.scientificName(idx_match);
+          taxa.scientificNameID(n_id) = taxa.scientificNameID(idx_match);
+          taxa.Comment{n_id} = 'AphiaID --> matched within family hierarchy';    
+          
+        end
+      end
+    end
+  end
+end % ecotaxa
+
+%% STEP11 | Save 
 % save_filename = ['taxa_' date '.mat'];
 % fprintf('Saving taxa matches to %s\n',[pwd filesep save_filename])
 % save(save_filename,'taxa');

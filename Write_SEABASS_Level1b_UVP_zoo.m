@@ -5,6 +5,10 @@ function Write_SEABASS_Level1b_UVP_zoo
 %   Module and creates a file for submission to NASA's SEABASS database
 %   https://seabass.gsfc.nasa.gov/wiki/Data_Submission/
 %
+%   Writes formatted sb file with only information from Ecotaxa exported
+%   TSV (DOI option from image module). Next step would be to incorporate
+%   information from local .dat files. 
+%
 % Steps:
 %   1. Read in detailed raw PAR file
 %   2. Format fields and column names following SeaBASS format
@@ -36,24 +40,25 @@ function Write_SEABASS_Level1b_UVP_zoo
 %  Andrew McDonnell <amcdonnell@alaska.edu>
 %% Configuration
 cfg.write_yaml_file = 0;                    % 1 = writes namespace file (YAML formatted), descriptions in 
-cfg.limit_to_taxa   = {'Salpida' 't008'};   % Cell array with limited taxa names
+
 cfg.ptwg_namespace             = struct();  % Writes associated terms to YAML file
 cfg.ptwg_namespace.id          = {'bad_image' 'bead' 'bubble' 'detritus' 'fecal_pellet' 'other'};
 cfg.ptwg_namespace.description = 'Ocean Carbon and Biogeochemistry Phytoplankton Taxonomy Working Group';
 cfg.ptwg_namespace.url         = 'https://seabass.gsfc.nasa.gov/wiki/ptwg_namespace';
-%% Level 1b fieldnames
-fields = SeaBASS_define_taxonomic_Level1b_fields;
 
-fprintf('LOOK THROUGH https://github.com/ecotaxa/ecotaxatoolbox/blob/master/UVPread_persample.m\n')
-fprintf('CALCULATE NECESSARY VARIABLES...\n');
 
 %% Define read and write filenames
 %% EXPORTSNP survey cruise R/V Sally Ride
 cruiseid = 'SR1812';
-ecotaxaf = 'ecotaxa_export_1591_20210329_1704'; % 'ecotaxa_export_1591_20210119_0944';%'task_42058_export_1591_20210329_1704'; % Folder name of ecotaxa exported RAW data
-projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
-
-raw_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel1b_Salps_survey_20180814-20180909_R0.sb';
+ecotaxaf = 'ecotaxa_export_1591_20210512_1846'; % 'ecotaxa_export_1591_20210119_0944';%'task_42058_export_1591_20210329_1704'; % Folder name of ecotaxa exported RAW data
+if ismac 
+  projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
+else
+  fprintf('enter filepath\n')
+  keyboard
+end
+raw_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel1b_survey_20180814-20180909_R0.sb';
+%cfg.limit_to_taxa   = {'Salpida' 't008'};   % Cell array with limited taxa names
 
 %% EXPORTSNP process cruise R/V Roger Revelle
 % cruiseid = 'RR1813';
@@ -74,6 +79,12 @@ switch cruiseid
   otherwise
     namespace = ['namespace_' cruiseid '.yaml'];
 end
+
+%% Level 1b fieldnames
+fields = SeaBASS_define_taxonomic_Level1b_fields;
+
+fprintf('LOOK THROUGH https://github.com/ecotaxa/ecotaxatoolbox/blob/master/UVPread_persample.m\n')
+fprintf('CALCULATE NECESSARY VARIABLES...\n');
 
 %% Specify write filename
 % Release number R0 suggested if data_type=preliminary
@@ -157,8 +168,12 @@ if ~exist(save_taxa_filename,'file')
   % Call script to go through and query AphiaID matches
   check_children_manual = false; % true = checks full classifcation of parent if child doesn't have a match and asks user. false = skips this.
   taxa = WoRMS_AphiaID_taxa_match(taxa,check_children_manual,'ecotaxa');
+  
+  
+  % Save to matlab file for simply loading next time
   fprintf('Saving taxa matches to %s\n',save_taxa_filename)
   save(save_taxa_filename,'taxa');
+  
 else % Load data instead of rerunning everything
   fprintf('Loading..%s\n',save_taxa_filename)
   load(save_taxa_filename);
@@ -176,18 +191,29 @@ end
 
 %% Add scientificName and scientificNameID to raw
 % initialize fields
-raw.scientificName   = raw.child_name; % These will be overwritten
-raw.scientificNameID = raw.child_name; % These will be overwritten
+raw.scientificName   = raw.child_name; % These will be overwritten, just initializing with correct size & class for now
+raw.scientificNameID = raw.child_name; % These will be overwritten, just initializing with correct size & class for now
+% Loop through and assign the WoRMS scientificName and scientificNameID
 for nt = 1:numel(taxa.Name)
   taxaname = taxa.Name{nt};
   idx_name = find(strcmp(raw.child_name,taxaname));
-  raw.scientificName(idx_name)   = taxa.scientificName(nt);
-  raw.scientificNameID(idx_name) = taxa.scientificNameID(nt);
+  % Skip if no matches found
+  if isempty(idx_name)
+    continue
+  end
   % If non-conforming, point to namespace
   if isempty(taxa.scientificName{nt})
     raw.scientificName(idx_name)   = raw.child_name(idx_name);
     raw.scientificNameID(idx_name) = {[namespace ':' raw.child_name{idx_name(1)}]};
+  else
+    raw.scientificName(idx_name)   = taxa.scientificName(nt);
+    raw.scientificNameID(idx_name) = taxa.scientificNameID(nt);
   end
+%   % test
+%   if strcmp(class(raw.scientificName{idx_name(end)}),'double')
+%     fprintf('bad case here... check why this happened\n')
+%     keyboard
+%   end
 end
 
 %% Write YAML-formatted namespace file defining non-conforming ROI's
@@ -201,11 +227,11 @@ if cfg.write_yaml_file
   [IDs,iu] = unique(raw.scientificNameID(idx_nonconforming));
   iu = idx_nonconforming(iu);
   if any(ismember(raw.scientificName(iu),cfg.ptwg_namespace.id))
-    fprintf(fid,'- prefix: ptwg\n')
+    fprintf(fid,'- prefix: ptwg\n');
     fprintf(fid,'  description: %s\n',cfg.ptwg_namespace.description);
     fprintf(fid,'  url: %s\n',cfg.ptwg_namespace.url);
   end
-  fprintf(fid,'- prefix: %s\n',namespace)
+  fprintf(fid,'- prefix: %s\n',namespace);
   fprintf(fid,'  description: \n');
   fprintf(fid,'  url: \n');
   fprintf(fid,'  terms: \n');
@@ -313,8 +339,16 @@ fmt(end) = [];
 % add newline character at the end
 fmt = [fmt '\n'];
 
-
 %% Build filename for assessed IDs
+% Providing a list of all scientificName/scientificNameID pairs assessed by
+% the automated classifier with the data submission enables the
+% determination of both presence and absence of annotations in the Level 1b
+% file. Supplementary lists of which taxonomic categories were assessed by
+% manual and/or automatic classification methods are strongly recommended
+% and are required as part of data submissions if not every ROI in a given
+% datafile was classified. If every ROI was not classified, these lists are
+% essential for the downstream creation of summary products involving the
+% concentrations of phytoplankton taxa.
 assessed_id_file = ['Assessed_id_list_' cruiseid '.csv'];
 
 %% Generate SeaBASS header text
@@ -338,7 +372,7 @@ datemin = uvp.date{imin};
 timemax = uvp.time{imax};
 timemin = uvp.time{imin};
 
-volume_sampled_ml = num2str(str2double(raw.acq_volimage{1})/1000);  % Convert from L to mL
+volume_sampled_ml = num2str(str2double(raw.acq_volimage{1})*1000);  % Convert from L to mL
 pixel_per_um      = raw.process_pixel{1};                           % already in micrometer
 
 hdr_SEABASS={'/begin_header';
@@ -371,6 +405,7 @@ hdr_SEABASS={'/begin_header';
   ['/associated_files=images,'  assessed_id_file ',' original_file];...
   '/associated_file_types=planktonic,Assessed_IDs_list,raw';...
   ['/volume_sampled_ml=' volume_sampled_ml];...
+  ['/volume_imaged_ml='  volume_sampled_ml];...
   ['/pixel_per_um='      pixel_per_um];...
   'length_representation_instrument_varname=object_major*process_pixel';... % length_representation_instrument_varname (um): the instrument?s variable name equivalent to ?length_representation? (e.g., maxFeretDiameter).  
   'width_representation_instrument_varname=object_minor*process_pixel';...  % width_representation_instrument_varname (um): the instrument?s variable name equivalent to ?width_representation? (e.g., minFeretDiameter).   
@@ -412,9 +447,10 @@ end
 fprintf(fileID,'%s\n',hdr_SEABASS{:});% write header
 fprintf(fileID,fmt,raw_write{:});     % write data
 fclose(fileID);                       % close file
+
 % To troubleshoot why not printing correctly, comment above and just print to screen
-fprintf('%s\n',hdr_SEABASS{:}) % write header
-fprintf(fmt,raw_write{:})      % write data
+% fprintf('%s\n',hdr_SEABASS{:}) % write header
+% fprintf(fmt,raw_write{:})      % write data
 
 %% List of assessed IDs for automated and/or manual classification 
 assessed = struct();
