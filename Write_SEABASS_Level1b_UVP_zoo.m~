@@ -18,54 +18,20 @@ function Write_SEABASS_Level1b_UVP_zoo
 %   samples and their associated depths are included in the associated
 %   files in order to maintain provenance, allow the calculation of
 %   concentrations, and enable the determination of absence.
-%
-%   Taxonomic annotation:World Register of Marine Species (WoRMS) is the
-%   official taxonomic reference list for the Ocean Biodiversity
-%   Information System (OBIS) and was used to provide machine-readable
-%   taxonomic identifiers for living organisms. Taxonomic names were
-%   matched with a WoRMS AphiaID to the lowest taxonomic rank that could be
-%   identified. OBIS can harvest a scientificNameID containing a Life
-%   Science Identifier (LSID, http://www.lsid.info), a persistent globally
-%   unique identifier for biological objects in a database, from WoRMS. The
-%   use of LSIDs from a referenced database permits machine-readable
-%   taxonomic identifications. An LSID used in a taxonomic database
-%   consists of a uniform resource name (urn) that contains the following
-%   information in order: network identifier, a root DNS name of the
-%   reference database, a namespace, and the object number or taxon
-%   identifier (a living product) that is unique to the biological object
-%   defined by that referenced database. An example of a scientificNameID
-%   is urn:lsid:marinespecies.org:taxname:345868. In this example,
-%   ?urn:lsid? indicates the ID that is specific to life science data and
-%   is used for all files, marinespecies.org is the url for the reference
-%   database WoRMS, and the namespace ?taxname? informs the user that the
-%   following number represents a unique numerical identifier or taxon
-%   identifier in WoRMS. In the above example, 345868 represents the taxon
-%   identifier (AphiaID) in WoRMS for the Subclass Phaeodaria.
-%
-%   AphiaID?s are used to generate the scientificNameID, and if no AphiaID
-%   match is found for a living item, the scientificNameID was generated
-%   with the Algae Base id for Eukaryota (i.e.
-%   urn:lsid:algaebase.org:taxname:86701).
-%
-%   Processing scripts publicly available here:  
-%   https://github.com/britairving/UVP_submission_formatting 
+Taxonomic annotation:World Register of Marine Species (WoRMS) is the official taxonomic reference list for the Ocean Biodiversity Information System (OBIS) and was used to provide machine-readable taxonomic identifiers for living organisms. Taxonomic names were matched with a WoRMS AphiaID to the lowest taxonomic rank that could be identified. OBIS can harvest a scientificNameID containing a Life Science Identifier (LSID, http://www.lsid.info), a persistent globally unique identifier for biological objects in a database, from WoRMS. The use of LSIDs from a referenced database permits machine-readable taxonomic identifications. An LSID used in a taxonomic database consists of a uniform resource name (urn) that contains the following information in order: network identifier, a root DNS name of the reference database, a namespace, and the object number or taxon identifier (a living product) that is unique to the biological object defined by that referenced database. An example of a scientificNameID is urn:lsid:marinespecies.org:taxname:345868. In this example, ?urn:lsid? indicates the ID that is specific to life science data and is used for all files, marinespecies.org is the url for the reference database WoRMS, and the namespace ?taxname? informs the user that the following number represents a unique numerical identifier or taxon identifier in WoRMS. In the above example, 345868 represents the taxon identifier (AphiaID) in WoRMS for the Subclass Phaeodaria. 
+AphiaID?s were used to generate the scientificNameID, and if no AphiaID match was found for a living item, the scientificNameID was generated with the Algae Base id for Eukaryota (i.e. urn:lsid:algaebase.org:taxname:86701). 
+Processing scripts use for processing:  
+https://github.com/britairving/UVP_submission_formatting 
+
 %
 % Steps:
-%   1. Read individual particle and plankton level manual
-%      classifications exported from the Ecotaxa Image module in D.O.I.
-%      export (tsv) format
-%   2. Read in metadata from [cruiseid]_UVP_metadata.m
-%   3. Read sb fields from SeaBASS_define_taxonomic_Level1b_fields.m
-%   4. Query WoRMS database for taxa scientificNames and scientificNameIDs
-%   5. Write YAML-formatted namespace file defining non-conforming ROI's
-%   6. Calculate sb fields from definitions
-%   7. Build SeaBASS formatted metadata header 
-%   8. write level1 sb file
-%   9. Write Assessed_id_list_[cruiseid].csv file
+%   1. Read in detailed raw PAR file
+%   2. Format fields and column names following SeaBASS format
+%   3. Define metadata header that will be printed to .sb file
+%   4. Write sb file with DNSD and DVSD
+%   5. Write suplementary sb file with non-differential NSD and VSD
 %
 % References:
-%  https://github.com/britairving/UVP_submission_formatting
-%
 %  Picheral M, Colin S, Irisson J-O (2017). EcoTaxa, a tool for the
 %  taxonomic classification of images. http://ecotaxa.obs-vlfr.fr.
 %
@@ -86,11 +52,11 @@ function Write_SEABASS_Level1b_UVP_zoo
 %
 % Author:
 %  Brita Irving     <bkirving@alaska.edu>
-%% ** USER INPUT REQUIRED ** > Define cruise ID
+%% Define cruise ID
 cruiseid = 'SR1812';% EXPORTSNP survey cruise R/V Sally Ride
 %cruiseid = 'RR1813';% EXPORTSNP process cruise R/V Roger Revelle
 
-%% ** USER INPUT REQUIRED ** > Define project directory
+%% Define project directory
 if ismac 
   projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 else
@@ -116,17 +82,12 @@ if ~exist('hdr','var')
   error('*** Need "hdr" structure - called from [cruiseid]_UVP_metadata.m')
 end
 
-%% Level 1b fieldnames
-% Review SeaBASS_define_taxonomic_Level1b_fields.m to add new fields or
-% adjust fields as necessary. 
-fields = SeaBASS_define_taxonomic_Level1b_fields;
-
 %% Configuration
 cfg.write_yaml_file = 0;                    % 1 = writes namespace file (YAML formatted), descriptions in 
 cfg.ptwg_namespace             = struct();  % Writes associated terms to YAML file
 cfg.ptwg_namespace.id          = {'bad_image' 'bead' 'bubble' 'detritus' 'fecal_pellet' 'other'};
-cfg.ptwg_namespace.description = 'The Ocean Carbon and Biogeochemistry Phytoplankton Taxonomy Working Group (PTWG) namespace for non-conforming ROIs related to the imaging of plankton and other particles. Version 1.';
-cfg.ptwg_namespace.url         = 'https://seabass.gsfc.nasa.gov/ptwg_namespace_v1';
+cfg.ptwg_namespace.description = 'Ocean Carbon and Biogeochemistry Phytoplankton Taxonomy Working Group';
+cfg.ptwg_namespace.url         = 'https://seabass.gsfc.nasa.gov/wiki/ptwg_namespace';
 
 %% Build read filename 
 raw_rfile = fullfile(projectdir,hdr.ecotaxaf,[hdr.ecotaxaf '.tsv']); % based on project directory and exported ecotaxa name
@@ -143,8 +104,28 @@ else
   namespace = ['namespace_' cruiseid '.yaml'];
 end
 
+%% Level 1b fieldnames
+fields = SeaBASS_define_taxonomic_Level1b_fields;
+
+fprintf('LOOK THROUGH https://github.com/ecotaxa/ecotaxatoolbox/blob/master/UVPread_persample.m\n')
+fprintf('CALCULATE NECESSARY VARIABLES...\n');
+
+%% Specify write filename
+% Release number R0 suggested if data_type=preliminary
+ % specify write file, this is not computer specific because uses same path
+% Write files to submit folder
+submit_dir = fullfile(projectdir,'submit');
+if ~isdir(submit_dir)
+  try
+    mkdir(submit_dir);
+  catch
+    error('cannot create "submit" directory, maybe a permissions error?')
+  end
+end
+
 %% Read raw zoo data
 fprintf('\n  Reading raw Zooplankton data from... %s\n',raw_rfile)
+
 % check that file exists
 if ~exist(raw_rfile,'file')
   fprintf('File does not exist - make sure path and name are correct: %s\n',raw_rfile)
@@ -157,7 +138,6 @@ if isfield(hdr,'bad_object_id')
   bad = contains(raw.object_id,hdr.bad_object_id);
   raw(bad,:) = [];
 end
-
 %% Pull out unique taxa
 % This is necessary to query WoRMS and get the ScientificName and
 % ScientficNameID 
@@ -288,13 +268,13 @@ end
 % Level2 files are formatted from the detailed ODV file exported from
 % Ecotaxa Particle Module. See Write_SEABASS_Level2_UVP_zoo.m and
 % associated [cruiseid]_UVP_R2R_merge.m script for specifics.
-submitted_files = dir(fullfile(projectdir,'submit','*.sb'));
+submitted_files = dir(fullfile(submit_dir,'*.sb'));
 level2idx = find(contains({submitted_files.name},'TaxonomicLevel2'));
 if ~isempty(level2idx)
   level2file = submitted_files(level2idx).name;
   % Read in Level2 file
   % readsb.m from https://seabass.gsfc.nasa.gov/wiki/seabass_tools
-  L2 = readsb(fullfile(projectdir,'submit',level2file),'MakeStructure',true);
+  L2 = readsb(fullfile(submit_dir,level2file),'MakeStructure',true);
   if isfield(L2,'r2r_event')
     try %to match raw.sample_id to L2.station_alt_id (cast name equivalent)
       % Initialize r2r_event in raw
@@ -395,7 +375,6 @@ if isfield(hdr,'dat_info_file')
     writetable(dat, write_dat_filename,'FileType','text','Delimiter',',');
   end
 end
-
 %% Build data structure, column names, column units, and formatting for file writting
 % Variables are either pulled in based on the "rawfield" field, or
 % calculated using the eval function, where equations are defined in the
