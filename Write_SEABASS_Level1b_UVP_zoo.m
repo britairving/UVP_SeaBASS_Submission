@@ -36,48 +36,57 @@ function Write_SEABASS_Level1b_UVP_zoo
 %  include relevant metadata and processing information.
 %
 % Author:
-%  Brita Irving <bkirving@alaska.edu>
-%  Andrew McDonnell <amcdonnell@alaska.edu>
-%% Configuration
-cfg.write_yaml_file = 0;                    % 1 = writes namespace file (YAML formatted), descriptions in 
+%  Brita Irving     <bkirving@alaska.edu>
+%% Define cruise ID
+cruiseid = 'SR1812';% EXPORTSNP survey cruise R/V Sally Ride
+%cruiseid = 'RR1813';% EXPORTSNP process cruise R/V Roger Revelle
 
-cfg.ptwg_namespace             = struct();  % Writes associated terms to YAML file
-cfg.ptwg_namespace.id          = {'bad_image' 'bead' 'bubble' 'detritus' 'fecal_pellet' 'other'};
-cfg.ptwg_namespace.description = 'Ocean Carbon and Biogeochemistry Phytoplankton Taxonomy Working Group';
-cfg.ptwg_namespace.url         = 'https://seabass.gsfc.nasa.gov/wiki/ptwg_namespace';
-
-
-%% Define read and write filenames
-%% EXPORTSNP survey cruise R/V Sally Ride
-cruiseid = 'SR1812';
-ecotaxaf = 'ecotaxa_export_1591_20210512_1846'; % 'ecotaxa_export_1591_20210119_0944';%'task_42058_export_1591_20210329_1704'; % Folder name of ecotaxa exported RAW data
+%% Define project directory
 if ismac 
   projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 else
   fprintf('enter filepath\n')
   keyboard
 end
-raw_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel1b_survey_20180814-20180909_R0.sb';
-%cfg.limit_to_taxa   = {'Salpida' 't008'};   % Cell array with limited taxa names
 
-%% EXPORTSNP process cruise R/V Roger Revelle
-% cruiseid = 'RR1813';
-% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
-% raw_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel1b_process_20180814-20180909_R0.sb';
-% r2r_elog  = fullfile(projectdir,'R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx');
+%% Read in basic metadata for project
+try
+  % Change directory to project folder so can easily call metadata file
+  pwd_now = pwd;
+  cd(projectdir)
+  eval(['hdr = ' cruiseid '_UVP_metadata'])
+  % Change directory back to previous working directory
+  cd(pwd_now);
+catch % catch and explain why script stopped
+  fprintf('Cannot load hdr for this project\n')
+  fprintf('Need to set up %s_UVP_metadata.m script, see example provided\n',cruiseid)
+  keyboard
+end
+% Test that hdr loaded
+if ~exist('hdr','var')
+  error('*** Need "hdr" structure - called from [cruiseid]_UVP_metadata.m')
+end
 
-%% Build read filename based on project directory and exported ecotaxa name
-raw_rfile = fullfile(projectdir,ecotaxaf,[ecotaxaf '.tsv']);
+%% Configuration
+cfg.write_yaml_file = 0;                    % 1 = writes namespace file (YAML formatted), descriptions in 
+cfg.ptwg_namespace             = struct();  % Writes associated terms to YAML file
+cfg.ptwg_namespace.id          = {'bad_image' 'bead' 'bubble' 'detritus' 'fecal_pellet' 'other'};
+cfg.ptwg_namespace.description = 'Ocean Carbon and Biogeochemistry Phytoplankton Taxonomy Working Group';
+cfg.ptwg_namespace.url         = 'https://seabass.gsfc.nasa.gov/wiki/ptwg_namespace';
+
+%% Build read filename 
+raw_rfile = fullfile(projectdir,hdr.ecotaxaf,[hdr.ecotaxaf '.tsv']); % based on project directory and exported ecotaxa name
+raw_wfile = fullfile(projectdir,hdr.ecotaxaf,hdr.raw_wfile);         % based on name defined in [cruiseid]_UVP_metadata.m and project directory
+assessed_id_file = ['Assessed_id_list_' cruiseid '.csv'];            % Providing a list of all scientificName/scientificNameID pairs assessed by the automated classifier with the data submission enables the determination of both presence and absence of annotations in the Level 1b file. Supplementary lists of which taxonomic categories were assessed by manual and/or automatic classification methods are strongly recommended and are required as part of data submissions if not every ROI in a given datafile was classified. If every ROI was not classified, these lists are essential for the downstream creation of summary products involving the concentrations of phytoplankton taxa. 
 
 %% Unique namespace for non-conforming ROIs
 % Define namespace YAML-formatted filename used to define non-conforming
 % Use the same namespace for both EXPORTSNP cruises RR1813 and
 % SR1812 because submitted at the same time... February 2021
-switch cruiseid
-  case {'SR1812' 'RR1813'}
-    namespace = 'namespace_EXPORTSNP_UVP';
-  otherwise
-    namespace = ['namespace_' cruiseid '.yaml'];
+if isfield(hdr,'namespace')
+  namespace = hdr.namespace;
+else
+  namespace = ['namespace_' cruiseid '.yaml'];
 end
 
 %% Level 1b fieldnames
@@ -99,24 +108,6 @@ if ~isdir(submit_dir)
   end
 end
 
-%% Read in basic metadata for project
-try
-  % Change directory to project folder so can easily call metadata file
-  pwd_now = pwd;
-  cd(projectdir)
-  eval(['hdr = ' cruiseid '_UVP_metadata'])
-  % Change directory back to previous working directory
-  cd(pwd_now);
-catch % catch and explain why script stopped
-  fprintf('Cannot load hdr for this project\n')
-  fprintf('Need to set up %s_UVP_metadata.m script, see example provided\n',cruiseid)
-  keyboard
-end
-% Test that hdr loaded
-if ~exist('hdr','var')
-  error('*** Need "hdr" structure - called from [cruiseid]_UVP_metadata.m')
-end
-
 %% Read raw zoo data
 fprintf('\n  Reading raw Zooplankton data from... %s\n',raw_rfile)
 
@@ -127,7 +118,11 @@ end
 % read raw data from file
 raw = readtable(raw_rfile,'FileType','text');
 
-
+%% Remove bad object_id 
+if isfield(hdr,'bad_object_id')
+  bad = contains(raw.object_id,hdr.bad_object_id);
+  raw(bad,:) = [];
+end
 %% Pull out unique taxa
 % This is necessary to query WoRMS and get the ScientificName and
 % ScientficNameID 
@@ -179,13 +174,13 @@ else % Load data instead of rerunning everything
   load(save_taxa_filename);
 end
 
-%% Limit data to specific taxa as defined by cfg.limit_to_taxa
+%% Limit data to specific taxa as defined by hdr.limit_to_taxa
 % Cell array with taxonomic names selected by the user
-% For example:  cfg.limit_to_taxa = {'Salpida' 't008'};   
+% For example:  hdr.limit_to_taxa = {'Salpida' 't008'};   
 if isfield(cfg,'limit_to_taxa')
-  idx_taxa = ismember(taxa.Name,cfg.limit_to_taxa);
+  idx_taxa = ismember(taxa.Name,hdr.limit_to_taxa);
   taxa = taxa(idx_taxa,:);
-  idx_raw = ismember(raw.child_name,cfg.limit_to_taxa);
+  idx_raw = ismember(raw.child_name,hdr.limit_to_taxa);
   raw = raw(idx_raw,:);
 end
 
@@ -286,6 +281,85 @@ if ~isempty(level2idx)
   end % If R2R_EVENT is a field in the Level2 SeaBASS file
 end
 
+%% Add all the information from the DAT files in the UVP work folder
+% FROM OCB_PTWG_TM_FinalDraft_Dec2020.docx file
+% Supplementary lists of which taxonomic categories were assessed by manual
+% and/or automatic classification methods are strongly recommended and are
+% required as part of data submissions if not every ROI in a given datafile
+% was classified. If not every ROI was classified, these lists are
+% essential for the downstream creation of summary products involving the
+% concentrations of phytoplankton taxa. When every ROI is classified, these
+% lists are useful for determining absence. These lists may be specific to
+% a given water sample or datafile, e.g., if only diatoms are classified in
+% a sample, or they may be comprehensive of every class in a classifier.
+if isfield(hdr,'dat_info_file')
+  if exist(hdr.dat_info_file,'file')
+    % hdr.dat_info_file is a single text file containing all the .dat files
+    % merged into a single file from the "work" folders as processed by
+    % zooprocess. Generated with UVP_DAT_file_info_merge.m
+    % Headers are described in UVP5_User_Manual_20210201 section 2.5.4
+    % "DAT files description"
+    % Headers in: 
+    %   'index' = the image number, starting at 1 in the RAW dat files.
+    %   'image' = corresponding image acquisition time (YYYYMMDDHHMMSS_ms)
+    %   'p_centibar'  = Pressure in centi-bars
+    %   'datfilename' = name of the dat file read in
+    %   'work_folder' = name of the folder where dat file was located
+    dat = readtable(hdr.dat_info_file,'FileType','text');
+    % First, convert pressure centibar to pressure decibar
+    dat.p_dbar = dat.p_centibar./10;
+    % Match datfilename to raw.sample_profileid to get latitude
+    dat.profile_id = lower(erase(dat.datfilename,'.dat'));
+    uniqprofile_id = unique(dat.profile_id,'stable');
+    % initialize latitude
+    dat.latitude  = nan(size(dat.p_dbar));
+    % Loop through and get latitude for each profile
+    for np = 1:numel(uniqprofile_id)
+      pid  = uniqprofile_id(np);
+      idx_dat = strcmp(dat.profile_id,pid);
+      idx_raw = find(strcmp(raw.sample_profileid,pid),1);
+      if isempty(idx_raw)
+        continue
+      end
+      % assign latitude
+      if iscell(raw.object_lat)
+        dat.latitude(idx_dat) = str2double(raw.object_lat(idx_raw));
+      else
+        dat.latitude(idx_dat) = raw.object_lat(idx_raw);
+      end
+    end % UNIQUE PROFILES 
+    
+    % Calculate depth
+    dat.depth = -1.0*gsw_z_from_p(dat.p_dbar,dat.latitude);
+    %  Correct depth for the 1.2 m difference in the depth between the two
+    %  bases (depth transmitted to ecotaxa images is the depth recorded by
+    %  the sensor which is 1.2m above the imaged zone /// ecotaxa particles
+    %  does this correction but not the image module)
+    dat.depth_corrected =  dat.depth + 1.2;
+    
+    % %% check difference between depths
+    %     % Initialize depth_tsv field - this will be the depth corrected by the
+    %     % 1.2m offset.
+    %     dat.depth_tsv = nan(size(dat.p_dbar));
+    %     % pull out the raw vignette name which should be
+    %     % yyyymmddHHMMSS_mmm_xxxx
+    %     rawvignettes  = extractBefore(raw.object_rawvig,19);
+    %     unique_rawvig = unique(rawvignettes,'stable');
+    %     for nimage = 1:numel(unique_rawvig)
+    %       rawvig = unique_rawvig(nimage);
+    %       idx_raw = find(contains(raw.object_rawvig,rawvig),1);
+    %       idx_dat = find(strcmp(dat.image,rawvig));
+    %       if ~isempty(idx_dat)
+    %         dat.depth_tsv(idx_dat) = raw.object_depth_min(idx_raw)+1.2;
+    %       end
+    %     end % UNIQUE IMAGES
+    %% Write to file
+    hdr.merged_dat_file = [cruiseid '_merged_DAT.csv'];
+    write_dat_filename = fullfile(projectdir,hdr.ecotaxaf,hdr.merged_dat_file);
+    fprintf('Writing data to %s\n', write_dat_filename)
+    writetable(dat, write_dat_filename,'FileType','text','Delimiter',',');
+  end
+end
 %% Build data structure, column names, column units, and formatting for file writting
 % Variables are either pulled in based on the "rawfield" field, or
 % calculated using the eval function, where equations are defined in the
@@ -339,17 +413,6 @@ fmt(end) = [];
 % add newline character at the end
 fmt = [fmt '\n'];
 
-%% Build filename for assessed IDs
-% Providing a list of all scientificName/scientificNameID pairs assessed by
-% the automated classifier with the data submission enables the
-% determination of both presence and absence of annotations in the Level 1b
-% file. Supplementary lists of which taxonomic categories were assessed by
-% manual and/or automatic classification methods are strongly recommended
-% and are required as part of data submissions if not every ROI in a given
-% datafile was classified. If every ROI was not classified, these lists are
-% essential for the downstream creation of summary products involving the
-% concentrations of phytoplankton taxa.
-assessed_id_file = ['Assessed_id_list_' cruiseid '.csv'];
 
 %% Generate SeaBASS header text
 % Pull out raw filename
@@ -382,9 +445,7 @@ hdr_SEABASS={'/begin_header';
   ['/experiment='     hdr.experiment];
   ['/cruise='         hdr.cruise];
   ['/station='        hdr.station];
-  ['/data_file_name=' raw_wfile];
-  ['/associated_files=' original_file]; % The original name of the data file exported from Ecotaxa
-  '/associated_file_types=raw';
+  ['/data_file_name=' hdr.raw_wfile];
   ['/documents='      strjoin(hdr.documents.Level1b,',')];
   ['/data_type='      hdr.data_type];
   ['/data_status='    hdr.data_status.Level1b];
@@ -398,12 +459,12 @@ hdr_SEABASS={'/begin_header';
   ['/west_longitude=' num2str(lonmin) '[DEG]'];
   ['/missing='        hdr.missing];
   ['/delimiter='      hdr.delimiter];
-  ['/instrument_manufacturer='  hdr.inst_mfr];
-  ['/instrument_model='         hdr.inst_model];
-  ['/calibration_files='        hdr.calfiles];
-  ['/calibration_date='         hdr.caldates];...
-  ['/associated_files=images,'  assessed_id_file ',' original_file];...
-  '/associated_file_types=planktonic,Assessed_IDs_list,raw';...
+  ['/instrument_manufacturer=' hdr.inst_mfr];
+  ['/instrument_model='        hdr.inst_model];
+  ['/calibration_files='       hdr.calfiles];
+  ['/calibration_date='        hdr.caldates];...
+  ['/associated_files=images,' assessed_id_file ',' original_file];...
+    '/associated_file_types=imaging_UVP,Assessed_IDs_list,raw';...
   ['/volume_sampled_ml=' volume_sampled_ml];...
   ['/volume_imaged_ml='  volume_sampled_ml];...
   ['/pixel_per_um='      pixel_per_um];...
@@ -417,6 +478,12 @@ hdr_SEABASS = [hdr_SEABASS; hdr.comments.Level1b;...
   ['/fields=' colstr];
   ['/units='  colunits];
   '/end_header'];
+
+% Add associated file with merged DAT information.
+if isfield(hdr,'merged_dat_file')
+  hdr_SEABASS(contains(hdr_SEABASS,'associated_files='))      = strcat(hdr_SEABASS(contains(hdr_SEABASS,'associated_files=')),',',hdr.merged_dat_file);
+  hdr_SEABASS(contains(hdr_SEABASS,'associated_file_types=')) = strcat(hdr_SEABASS(contains(hdr_SEABASS,'associated_file_types=')),',metadata');  
+end
 
 % check if there is whitespace in any metadata headers
 % whitespace in comments is OKAY
@@ -438,10 +505,10 @@ if exist(raw_wfile,'file')
   delete(raw_wfile)
 end
 
-fprintf('\n  Writing data in raw format to: %s\n',fullfile(submit_dir,raw_wfile));
-fileID = fopen(fullfile(submit_dir,raw_wfile),'w');  % open file
+fprintf('\n  Writing data in raw format to: %s\n',raw_wfile);
+fileID = fopen(raw_wfile,'w');  % open file
 if fileID < 0
-  fprintf(' *** Error opening file %s\n',fullfile(submit_dir,raw_wfile))
+  fprintf(' *** Error opening file %s\n',raw_wfile)
   keyboard
 end
 fprintf(fileID,'%s\n',hdr_SEABASS{:});% write header
@@ -453,6 +520,16 @@ fclose(fileID);                       % close file
 % fprintf(fmt,raw_write{:})      % write data
 
 %% List of assessed IDs for automated and/or manual classification 
+% Providing a list of all scientificName/scientificNameID pairs assessed by
+% the automated classifier with the data submission enables the
+% determination of both presence and absence of annotations in the Level 1b
+% file. Supplementary lists of which taxonomic categories were assessed by
+% manual and/or automatic classification methods are strongly recommended
+% and are required as part of data submissions if not every ROI in a given
+% datafile was classified. If every ROI was not classified, these lists are
+% essential for the downstream creation of summary products involving the
+% concentrations of phytoplankton taxa.
+
 assessed = struct();
 [~,idx_unique] = unique(uvp.data_provider_category_manual,'stable');
 assessed.data_provider_category_manual    = uvp.data_provider_category_manual(idx_unique);

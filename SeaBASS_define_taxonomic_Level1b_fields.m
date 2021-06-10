@@ -46,17 +46,19 @@ fields = struct();
 fields.station.description = 'Sample station';
 fields.station.requirement = 'optional'; %
 fields.station.units       = 'none'; 
-fields.station.rawfield    = 'sample_stationid';
-
-fields.eventID.description = 'A unique identifier associated with the sample as an event';
-fields.eventID.requirement = 'optional'; %
-fields.eventID.units       = 'none'; 
-fields.eventID.rawfield    = 'sample_id'; % This is the same as station_alt_id in the Level2 ZOO file
+fields.station.rawfield    = 'sample_stationid'; % e.g. "ss1" "ls_18" "wire_walker_calibration_-_3"
 
 fields.station_alt_id.description = 'Alternate sample station identifier (use ONLY if station has already been used as a field name)';
 fields.station_alt_id.requirement = 'optional';
 fields.station_alt_id.units       = 'none';
-fields.station_alt_id.rawfield    = 'sample_profileid'; % e.g. hdr20180811192455
+fields.station_alt_id.rawfield    = 'sample_id'; % e.g. ctd001
+
+
+fields.eventID.description = 'A unique identifier associated with the sample as an event';
+fields.eventID.requirement = 'optional'; %
+fields.eventID.units       = 'none'; 
+fields.eventID.rawfield    = 'object_rawvig'; % This is the same as station_alt_id in the Level2 ZOO file
+
 
 % Fields not listed in SeaBASS wiki on plankton_and_particles (see
 % comments) but important to note
@@ -64,6 +66,7 @@ fields.depth.description = 'Depth of measurement';
 fields.depth.requirement = 'optional'; %
 fields.depth.units       = 'm'; 
 fields.depth.calculate   = 'raw.object_depth_min+1.2'; % Note that there is a 1.2 m difference in the depth between the two bases (depth transmitted to ecotaxa images is the depth recorded by the sensor which is 1.2m above the imaged zone /// ecotaxa particles does this correction but not the image module)
+
 fields.lat.description = 'Sample latitude (decimal fractions; -90 to 90)';
 fields.lat.requirement = 'optional'; %
 fields.lat.units       = 'degrees'; 
@@ -82,7 +85,8 @@ fields.date.rawfield    = 'object_date'; % E.g. date = raw.object_date;
 fields.time.description = 'Sample time';
 fields.time.requirement = 'optional'; 
 fields.time.units       = 'hh:mm:ss'; 
-fields.time.calculate   = "insertAfter(insertAfter(raw.object_time,2,':'),5,':')"; % Convert from hhmmss to hh:mm:ss
+fields.time.calculate   = "insertAfter(insertAfter(extractBetween(raw.object_rawvig,9,14),2,':'),5,':')"; % pull out time from object_rawvig field then convert from hhmmss to hh:mm:ss 
+% fields.time.calculate   = "insertAfter(insertAfter(raw.object_time,2,':'),5,':')"; % Convert from hhmmss to hh:mm:ss
 
 fields.R2R_Event.description = 'Rolling Deck to Repository (R2R) Unique sample event number';
 fields.R2R_Event.requirement = 'optional'; 
@@ -98,7 +102,7 @@ fields.associatedMedia.rawfield    = 'img_file_name'; % e.g. images/Annelida/106
 fields.associatedMedia_source.description = 'a unique persistent URL pointing to the landing page for a water sample from which multiple ROIs are derived';
 fields.associatedMedia_source.requirement = 'optional';
 fields.associatedMedia_source.units       = 'none';
-fields.associatedMedia_source.rawfield    = 'object_rawvig'; % 
+fields.associatedMedia_source.calculate   = 'extractBefore(raw.object_rawvig,19)'; % e.g. '20180811192720_032' from '20180811192720_032_0001'
 
 % From Dr. Aimee Neeley
 % I think Brita has the right idea generally. I would suggest she put
