@@ -28,12 +28,6 @@ projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruise
 odv_rfile          = fullfile(projectdir,'export_detailed_20210325_18_53','export_detailed_20210325_18_53_ZOO_odv.txt');
 validated_profiles = fullfile(projectdir,'uvp5_sn009_2015_p16n_fully_validated_stations.txt');
 
- % specify write file, this is not computer specific because uses same path
-% Write files to submit folder
-submit_dir = fullfile(projectdir,'submit');
-if ~isdir(submit_dir)
-  mkdir(submit_dir);
-end
 
 %% Read in basic metadata for project
 [~,original_file,ext] = fileparts(odv_rfile);
@@ -99,7 +93,7 @@ meta_idx = find(contains(cols,'METAVAR'));
 
 % remove unnecessary text from table column names
 remove_text_from_columns = {'_METAVAR_TEXT_40','_METAVAR_TEXT_20', '_METAVAR_TEXT_10', '__METAVAR_DOUBLE','__PRIMARYVAR_DOUBLE','_degrees_east','_degrees_north'};
-table_options.VariableNames = erase(table_options.VariableNames,remove_text_from_columns);
+table_options.VariableNames = eras(table_options.VariableNames,remove_text_from_columns);
 % now remove unnecessary text from original column names
 remove_text_from_columns = strrep(remove_text_from_columns,'_',':');
 remove_text_from_columns = strrep(remove_text_from_columns,'::',':');
@@ -359,8 +353,8 @@ catch
 end
 
 %% Write ParameterDescriptions table
-fprintf('Writing parameter descriptions to %s\n',fullfile(submit_dir,'UVP_ZOO_ParameterDescriptions.xlsx'))
-writetable(fields,fullfile(submit_dir,'UVP_ZOO_ParameterDescriptions.xlsx'))
+fprintf('Writing parameter descriptions to %s\n',fullfile(projectdir,'UVP_ZOO_ParameterDescriptions.xlsx'))
+writetable(fields,fullfile(projectdir,'UVP_ZOO_ParameterDescriptions.xlsx'))
 
 %% Generate header text to write to file
 % first pull out max/min latitude, longitude, date, and time
@@ -429,9 +423,9 @@ odv_write(cellfun(@(x) isnumeric(x) && isnan(x), odv_write)) = {-9999}; % missin
  %% Write odv table to file
 % specify write filename
 try
-  wfile_name = fullfile(submit_dir,[hdr.ecotaxa_name '_BCO-DMO_ZOO.txt']);
+  wfile_name = fullfile(projectdir,[hdr.ecotaxa_name '_BCO-DMO_ZOO.txt']);
 catch
-  wfile_name = fullfile(submit_dir,strrep(odv_rfile,'.txt','_BCO-DMO_ZOO.txt'));
+  wfile_name = fullfile(projectdir,strrep(odv_rfile,'.txt','_BCO-DMO_ZOO.txt'));
 end
 % Delete file if it is release R0 - i.e. preliminary
 if exist(wfile_name,'file') 

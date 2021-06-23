@@ -37,13 +37,6 @@ cruiseid   = 'RB1503';
 projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 odv_rfile  = fullfile(projectdir,'export_detailed_20210325_18_53','export_detailed_20210325_18_53_PAR_odv.txt');
 
- % specify write file, this is not computer specific because uses same path
-% Write files to submit folder
-submit_dir = fullfile(projectdir,'submit');
-if ~isdir(submit_dir)
-  mkdir(submit_dir);
-end
-
 %% Read in basic metadata for project
 [~,original_file,ext] = fileparts(odv_rfile);
 original_file = [original_file ext];
@@ -357,14 +350,14 @@ colunits = strjoin(units,','); %[colstr,cols2{i},','];
 % Combine column names into a single string
 colstr = strjoin(cols2,','); % colstr=[colstr,cols2{i},','];
 
-% Remove bad data (some profiles seemed to only have a few liters of sampled
-% volume per depth bin, resulting in mostly empty particle size
-% distributions)
-try
-  odv2(odv2.LPM_102_128_m___L_1_ == 0,:) = [];
-catch
-  % may not work in variable names are different
-end
+% % Remove bad data (some profiles seemed to only have a few liters of sampled
+% % volume per depth bin, resulting in mostly empty particle size
+% % distributions)
+% try
+%   odv2(odv2.LPM_102_128_m___L_1_ == 0,:) = [];
+% catch
+%   % may not work in variable names are different
+% end
 
 %% Generate table that includes all variables with description, units, size bin, etc
 fields = table();
@@ -372,8 +365,8 @@ fields.VariableName = cols2';
 fields.Units = units';
 fields.Description = descr';
 %% Write ParameterDescriptions table
-fprintf('Writing parameter descriptions to %s\n',fullfile(submit_dir,'UVP_PAR_ParameterDescriptions.xlsx'))
-writetable(fields,fullfile(submit_dir,'UVP_PAR_ParameterDescriptions.xlsx'))
+fprintf('Writing parameter descriptions to %s\n',fullfile(projectdir,'UVP_PAR_ParameterDescriptions.xlsx'))
+writetable(fields,fullfile(projectdir,'UVP_PAR_ParameterDescriptions.xlsx'))
 
 %% Generate header text to write to file
 % first pull out max/min latitude, longitude, date, and time
@@ -441,9 +434,9 @@ odv_write(cellfun(@(x) isnumeric(x) && isnan(x), odv_write)) = {-9999}; % missin
  %% Write odv table to file
 % specify write filename
 try
-  wfile_name = fullfile(submit_dir,[hdr.ecotaxa_name '_BCO-DMO_PAR.txt']);
+  wfile_name = fullfile(projectdir,[hdr.ecotaxa_name '_BCO-DMO_PAR.txt']);
 catch
-  wfile_name = fullfile(submit_dir,strrep(odv_rfile,'.txt','_BCO-DMO_PAR.txt'));
+  wfile_name = fullfile(projectdir,strrep(odv_rfile,'.txt','_BCO-DMO_PAR.txt'));
 end
 % Delete file if it is release R0 - i.e. preliminary
 if exist(wfile_name,'file') 

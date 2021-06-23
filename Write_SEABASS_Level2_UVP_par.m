@@ -33,7 +33,7 @@ cruiseid = 'SR1812';
 projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 
 odv_rfile = fullfile(projectdir,'export_detailed_20210201_19_26','export_detailed_20210201_19_26_PAR_odv.txt');
-odv_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_survey_20180814-20180909_R1.sb';
+sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_survey_20180814-20180909_R1.sb';
 r2r_elog  = fullfile(projectdir,'R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx');
 
 
@@ -42,7 +42,7 @@ r2r_elog  = fullfile(projectdir,'R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.
 % projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 % 
 % odv_rfile = fullfile(projectdir,'export_detailed_20210128_08_11','export_detailed_20210128_08_11_PAR_odv.txt');
-% odv_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_process_20180814-20180909_R1.sb';
+% sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_process_20180814-20180909_R1.sb';
 % r2r_elog  = fullfile(projectdir,'R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx');
 
 %% Specify write filename
@@ -59,17 +59,17 @@ if ~isdir(submit_dir)
 end
 
 % Delete file if it is release R0 - i.e. preliminary
-if exist(fullfile(submit_dir,odv_wfile),'file') && contains(odv_wfile,'R0')
-  delete(fullfile(submit_dir,odv_wfile))
+if exist(fullfile(submit_dir,sb_wfile),'file') && contains(sb_wfile,'R0')
+  delete(fullfile(submit_dir,sb_wfile))
 else % rename if file already exists so don't overwrite
   release_num = 1;
-  while exist(fullfile(submit_dir,odv_wfile),'file')
-    odv_wfile =  strrep(odv_wfile,['R' num2str(release_num) '.sb'],['R' num2str(release_num+1) '.sb']);
+  while exist(fullfile(submit_dir,sb_wfile),'file')
+    sb_wfile =  strrep(sb_wfile,['R' num2str(release_num) '.sb'],['R' num2str(release_num+1) '.sb']);
     release_num = release_num + 1;
   end
 end
 % define additional file to store non-differential NSD and VSD
-odv_wfile_supp = strrep(odv_wfile,'_differential_','_nondifferential_');
+sb_wfile_supp = strrep(sb_wfile,'_differential_','_nondifferential_');
 
 %% Read in basic metadata for project
 
@@ -685,7 +685,7 @@ hdr_SEABASS={'/begin_header';
   ['/experiment='         hdr.experiment];
   ['/cruise='             hdr.cruise];
   ['/station='            hdr.station];
-  ['/data_file_name='     odv_wfile];
+  ['/data_file_name='     sb_wfile];
   ['/associated_files='   original_file]; % The original name of the data file exported from Ecotaxa
   '/associated_file_types=raw';
   ['/documents='          strjoin(hdr.documents.PAR,',')];
@@ -753,13 +753,13 @@ odv_write = odv_write';            % transpose because fprintf function prints d
 odv_write(cellfun(@(x) isnumeric(x) && isnan(x), odv_write)) = {-9999}; % missing=-9999 SeaBASS required header field
 
 %% Write odv table to DIFFERENTIAL file
-fprintf('\n  Deleting data file, if it exist (if it does not exist, you may get a WARNING, but this is OK: %s\n',odv_wfile);
-eval(['delete ' odv_wfile])
+fprintf('\n  Deleting data file, if it exist (if it does not exist, you may get a WARNING, but this is OK: %s\n',sb_wfile);
+eval(['delete ' sb_wfile])
 
-fprintf('\n  Writing data in ODV format to: %s\n',fullfile(submit_dir,odv_wfile));
-fileID = fopen(fullfile(submit_dir,odv_wfile),'w');  % open file
+fprintf('\n  Writing data in ODV format to: %s\n',fullfile(submit_dir,sb_wfile));
+fileID = fopen(fullfile(submit_dir,sb_wfile),'w');  % open file
 if fileID < 0
-  fprintf(' *** Error opening file %s\n',fullfile(submit_dir,odv_wfile))
+  fprintf(' *** Error opening file %s\n',fullfile(submit_dir,sb_wfile))
   keyboard
 end
 fprintf(fileID,'%s\n',hdr_SEABASS{:});  % write header
@@ -848,7 +848,7 @@ hdr_SEABASS(contains(hdr_SEABASS,'/fields')) = {['/fields=' colstr]};
 hdr_SEABASS(contains(hdr_SEABASS,'/units')) = {['/units=' colunits]};
 
 %% Swap 'data_file_name' and 'associated_files' in metadata header
-hdr_SEABASS(contains(hdr_SEABASS,['/data_file_name=' odv_wfile])) = {['/data_file_name=' odv_wfile_supp]};
+hdr_SEABASS(contains(hdr_SEABASS,['/data_file_name=' sb_wfile])) = {['/data_file_name=' sb_wfile_supp]};
 % Swap uncertainty descriptions
 hdr_SEABASS(contains(hdr_SEABASS,u_text_differential)) = u_text_nondifferential;
 
@@ -867,10 +867,10 @@ odv_write = odv_write';       % transpose because fprintf function prints data c
 odv_write(cellfun(@(x) isnumeric(x) && isnan(x), odv_write)) = {-9999}; % missing=-9999 SeaBASS required header field
 
 %% Write odv table to NONDIFFERENTIAL file
-fprintf('\n  Writing data in ODV format to: %s\n',fullfile(submit_dir,odv_wfile_supp));
-fileID = fopen(fullfile(submit_dir,odv_wfile_supp),'w');  % open file
+fprintf('\n  Writing data in ODV format to: %s\n',fullfile(submit_dir,sb_wfile_supp));
+fileID = fopen(fullfile(submit_dir,sb_wfile_supp),'w');  % open file
 if fileID < 0
-  fprintf(' *** Error opening file %s\n',fullfile(submit_dir,odv_wfile_supp))
+  fprintf(' *** Error opening file %s\n',fullfile(submit_dir,sb_wfile_supp))
   keyboard
 end
 fprintf(fileID,'%s\n',hdr_SEABASS{:}); % write header
