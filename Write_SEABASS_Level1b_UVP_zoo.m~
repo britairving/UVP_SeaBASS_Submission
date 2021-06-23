@@ -440,7 +440,6 @@ for ncol = 1:numel(colnames)
   end
 end
 
-keyboard
 % Combine all units into a single string
 colunits = strjoin(colunits,','); 
 % Combine column names into a single string
@@ -482,7 +481,6 @@ hdr_SEABASS={'/begin_header';
   ['/experiment='     hdr.experiment];
   ['/cruise='         hdr.cruise];
   ['/station='        hdr.station];
-  '/water_depth=NA';
   ['/data_file_name=' hdr.raw_wfile];
   ['/documents='      strjoin(hdr.documents.Level1b,',')];
   ['/data_type='      hdr.data_type];
@@ -506,8 +504,8 @@ hdr_SEABASS={'/begin_header';
   ['/volume_sampled_ml=' volume_sampled_ml];...
   ['/volume_imaged_ml='  volume_sampled_ml];...
   ['/pixel_per_um='      pixel_per_um];...
-  '/length_representation_instrument_varname=object_major*process_pixel';... % length_representation_instrument_varname (um): the instrument?s variable name equivalent to ?length_representation? (e.g., maxFeretDiameter).  
-  '/width_representation_instrument_varname=object_minor*process_pixel';...  % width_representation_instrument_varname (um): the instrument?s variable name equivalent to ?width_representation? (e.g., minFeretDiameter).   
+  'length_representation_instrument_varname=object_major*process_pixel';... % length_representation_instrument_varname (um): the instrument?s variable name equivalent to ?length_representation? (e.g., maxFeretDiameter).  
+  'width_representation_instrument_varname=object_minor*process_pixel';...  % width_representation_instrument_varname (um): the instrument?s variable name equivalent to ?width_representation? (e.g., minFeretDiameter).   
   '!'};
 
 % Insert comments, then finish with /fields and /units

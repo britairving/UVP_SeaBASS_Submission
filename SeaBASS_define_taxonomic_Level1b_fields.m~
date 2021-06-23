@@ -123,11 +123,11 @@ fields.data_provider_category_manual.units       = 'none';
 % fields.data_provider_category_manual.rawfield    = 'object_annotation_category';  % e.g. 'Annelida' from object_annotation_hierarchy = 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
 fields.data_provider_category_manual.rawfield    = 'object_annotation_hierarchy'; % e.g. 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
 
-% % Andrew requested that all fields with the "autumated" suffix be removed becuase all of our images were categorized by a human, so they should all end in _manual.  
-% fields.data_provider_category_automated.description = 'A category used by the data provider to name the organism or particle for an automated classification, not necessarily a scientific name (e.g., pennate or detritus).';
-% fields.data_provider_category_automated.requirement = 'optional'; % (recommended but optional) 
-% fields.data_provider_category_automated.units       = 'none';
-% fields.data_provider_category_automated.rawfield    = 'object_annotation_hierarchy'; % e.g. 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
+
+fields.data_provider_category_automated.description = 'A category used by the data provider to name the organism or particle for an automated classification, not necessarily a scientific name (e.g., pennate or detritus).';
+fields.data_provider_category_automated.requirement = 'optional'; % (recommended but optional) 
+fields.data_provider_category_automated.units       = 'none';
+fields.data_provider_category_automated.rawfield    = 'object_annotation_hierarchy'; % e.g. 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
 
 % The scientificName/scientificNameID pairs can be determined manually by
 % searching WoRMS or automatically using web services with a script or with
