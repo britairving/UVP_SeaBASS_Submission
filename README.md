@@ -10,3 +10,8 @@ SeaBASS <https://seabass.gsfc.nasa.gov/#> is the SeaWiFS Bio-optical Archive and
 
 BCO-DMO <https://www.bco-dmo.org/about-us> is the Biological & Chemical Oceanography Data Management Office.
 * Example dataset: P16N Repeat Hydrography cruise in 2015 <https://www.bco-dmo.org/dataset/787966>
+
+# Citation/acknowledgement
+If you use this toolbox, please cite as follows:
+_Brita Irving, (2021), UVP_submission_formatting, GitHub repository, https://github.com/britairving/UVP_submission_formatting/_
+***
