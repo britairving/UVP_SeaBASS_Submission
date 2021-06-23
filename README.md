@@ -1,15 +1,15 @@
 # UVP_submission_formatting
 https://github.com/britairving/UVP_submission_formatting/
 
-Scripts used to format UVP data for submission to data archival websites SeaBASS and BCO-DMO. UVP data must be downloaded from Ecotaxa's Particle Module in detailed ODV format first. 
+This repository provides scripts to reformat UVP data downloaded from Ecotaxa for submission to data archival websites SeaBASS and BCO-DMO.
 
-The Underwater Video Profiler (UVP) is designed for the quantification of particles and of large zooplankton in the water column. Light reflected by undisturbed target objects forms a dark-field image.
+The Underwater Video Profiler (UVP) is designed for the quantification of particles and of large zooplankton in the water column. The UVP5 software acquires and processes images in real time. During the downcast, The UVP5 captures images of a known volume of water.  Particles are detected and analyzed to get size and grey level for each region of interest. Image post processing and metadata creation is accomplished with the Zooprocess software. Images and their associated metadata have been uploaded to the Ecotaxa website (http://ecotaxa.obs-vlfr.fr/) which serves as a tool for taxonomic annotation of zooplankton and classification of non-living particles, using machine learning and human verification, as well as a repository for all globally collected UVP data.
 
 ***
 # Setup
 See Setup wiki page for details on how to organize your data and configuration scripts to utilize this toolbox, and how to export data in the appropriate format from Ecotaxa's Image and Particle Modules.
 
-Insert link here...
+https://github.com/britairving/UVP_submission_formatting/wiki/Setup
 ***
 # Table of contents
 #### Write_BCO_DMO_UVP_par.m
