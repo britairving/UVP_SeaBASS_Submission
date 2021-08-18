@@ -86,6 +86,7 @@ function Write_SEABASS_Level1b_UVP_zoo
 %
 % Author:
 %  Brita Irving     <bkirving@alaska.edu>
+
 %% ** USER INPUT REQUIRED ** > Define cruise ID
 cruiseid = 'SR1812';% EXPORTSNP survey cruise R/V Sally Ride
 %cruiseid = 'RR1813';% EXPORTSNP process cruise R/V Roger Revelle
@@ -94,8 +95,7 @@ cruiseid = 'SR1812';% EXPORTSNP survey cruise R/V Sally Ride
 if ismac 
   projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 else
-  fprintf('enter filepath\n')
-  keyboard
+  projectdir = fullfile('D:','MATLAB','UVP_project_data',cruiseid);
 end
 
 %% Read in basic metadata for project
@@ -122,7 +122,8 @@ end
 fields = SeaBASS_define_taxonomic_Level1b_fields;
 
 %% Configuration
-cfg.write_yaml_file = 0;                    % 1 = writes namespace file (YAML formatted), descriptions in 
+cfg.write_yaml_file = 0; % 1 = writes namespace file (YAML formatted), descriptions in 
+cfg.single_sb_file  = 1; % 1 = writes all data to a single sb file. 0 = writes sb file for each eventID (cast in our case)
 cfg.ptwg_namespace             = struct();  % Writes associated terms to YAML file
 cfg.ptwg_namespace.id          = {'bad_image' 'bead' 'bubble' 'detritus' 'fecal_pellet' 'other'};
 cfg.ptwg_namespace.description = 'The Ocean Carbon and Biogeochemistry Phytoplankton Taxonomy Working Group (PTWG) namespace for non-conforming ROIs related to the imaging of plankton and other particles. Version 1.';
@@ -130,7 +131,6 @@ cfg.ptwg_namespace.url         = 'https://seabass.gsfc.nasa.gov/ptwg_namespace_v
 
 %% Build read filename 
 raw_rfile = fullfile(projectdir,hdr.ecotaxaf,[hdr.ecotaxaf '.tsv']); % based on project directory and exported ecotaxa name
-raw_wfile = fullfile(projectdir,hdr.ecotaxaf,hdr.raw_wfile);         % based on name defined in [cruiseid]_UVP_metadata.m and project directory
 assessed_id_file = ['Assessed_id_list_' cruiseid '.csv'];            % Providing a list of all scientificName/scientificNameID pairs assessed by the automated classifier with the data submission enables the determination of both presence and absence of annotations in the Level 1b file. Supplementary lists of which taxonomic categories were assessed by manual and/or automatic classification methods are strongly recommended and are required as part of data submissions if not every ROI in a given datafile was classified. If every ROI was not classified, these lists are essential for the downstream creation of summary products involving the concentrations of phytoplankton taxa. 
 
 %% Unique namespace for non-conforming ROIs
@@ -151,6 +151,15 @@ if ~exist(raw_rfile,'file')
 end
 % read raw data from file
 raw = readtable(raw_rfile,'FileType','text');
+% Convert all doubles to cell array of characters so that
+% SeaBASS_define_taxonomic_Level1b_fields.m equations will work
+fprintf('Converting numeric columns to strings\n')
+for ns = 1:numel(raw.Properties.VariableNames)
+  sfield = raw.Properties.VariableNames{ns};
+  if isnumeric(raw.(sfield))
+    raw.(sfield) = cellstr(num2str(raw.(sfield)));
+  end
+end
 
 %% Remove bad object_id 
 if isfield(hdr,'bad_object_id')
@@ -406,7 +415,7 @@ end
 uvp = struct(); % data structure for required/recommended/optional fields
 colstrns = {};  % cell array built with names, will be converted to char
 colunits = {};  % cell array built with units, will be converted to char
-fmt      = '';  % format used to write data to file
+fmt      = {};  % format used to write data to file
 % LOOP THROUGH FIELDS DEFINED IN SeaBASS_define_taxonomic_Level1b_fields.m
 colnames = fieldnames(fields);
 for ncol = 1:numel(colnames)
@@ -417,9 +426,9 @@ for ncol = 1:numel(colnames)
       colstrns = [colstrns; fname];
       colunits = [colunits; fields.(fname).units];
       if iscell(uvp.(fname))
-        fmt = [fmt '%s,'];
+        fmt = [fmt; '%s'];
       else
-        fmt = [fmt '%f,'];
+        fmt = [fmt; '%.4f'];
       end
     elseif isfield(fields.(fname),'calculate')
       fprintf(' calculating... %s = %s\n',fname,fields.(fname).calculate)
@@ -427,9 +436,9 @@ for ncol = 1:numel(colnames)
       colstrns = [colstrns; fname];
       colunits = [colunits; fields.(fname).units];
       if iscell(uvp.(fname))
-        fmt = [fmt '%s,'];
-      else
-        fmt = [fmt '%f,'];
+        fmt = [fmt; '%s'];
+      else % set resolution to 4 significant figures
+        fmt = [fmt; '%.4f'];
       end
     else
       fprintf('unknown case...%s\n',fname)
@@ -440,134 +449,195 @@ for ncol = 1:numel(colnames)
   end
 end
 
-keyboard
-% Combine all units into a single string
+%% Set non-living objects  scientificName_manual to -9999  
+uvp.scientificName_manual(contains(raw.object_annotation_hierarchy,'not-living')) = {'-9999'};
+%% Remove the hierarchy from data_provider_category_manual
+% The field data_provider_category_manual should have the last category.
+% For example, not-living>artefact>bubble, should be a bubble.
+% This was already done above, secondary method below....
+uvp.data_provider_category_manual = raw.child_name;
+% % done = 0;
+% % while ~done
+% %   idx_bad = contains(uvp.data_provider_category_manual,'>');
+% %   if ~any(idx_bad) % No more > characters in the field
+% %     done = 1;
+% %   else 
+% %     uvp.data_provider_category_manual(idx_bad) = extractAfter(uvp.data_provider_category_manual(idx_bad),'>');
+% %   end
+% % end
+
+
+%% Write single sb file for entire dataset, or split by eventID
+if cfg.single_sb_file
+  num_sb_files = 1;
+else
+  eventIDs = unique(uvp.eventID);
+  num_sb_files = numel(eventIDs);
+  % convert to table, so can index data by eventID
+  UVP = struct2table(uvp);
+  % remove eventID, and R2R_Event if necessary, from fields
+  idx_rm = contains(colstrns,{'eventID' 'R2R_Event'});
+  colstrns(idx_rm) = [];
+  colunits(idx_rm) = [];
+  fmt(idx_rm)      = [];
+end
+
+%% Combine column names, units, and format into a single string
 colunits = strjoin(colunits,','); 
 % Combine column names into a single string
 colstr = strjoin(colstrns,','); 
 % remove trailing comma
-fmt(end) = [];
+fmt = strjoin(fmt,','); 
 % add newline character at the end
 fmt = [fmt '\n'];
 
 
-%% Generate SeaBASS header text
-% Pull out raw filename
-[~,original_file,ext] = fileparts(raw_rfile);
-original_file = [original_file ext];
-
-% pull out max/min latitude, longitude, date, and time
-latmax = num2str(max(uvp.lat));
-latmin = min(uvp.lat);
-lonmax = max(uvp.lon);
-lonmin = min(uvp.lon);
-
-% Find the first and last date/time for SEABASS metadata header
-% since odv2 table has already been sorted by datetime (early on), just
-% pull out first and last
-[~,imin] = min(str2double(uvp.date));
-[~,imax] = max(str2double(uvp.date));
-datemax = uvp.date{imax};
-datemin = uvp.date{imin};
-timemax = uvp.time{imax};
-timemin = uvp.time{imin};
-
-volume_sampled_ml = num2str(str2double(raw.acq_volimage{1})*1000);  % Convert from L to mL
-pixel_per_um      = raw.process_pixel{1};                           % already in micrometer
-
-hdr_SEABASS={'/begin_header';
-  ['/investigators='  hdr.investigators];
-  ['/affiliations='   hdr.affiliations];
-  ['/contact='        hdr.contact];
-  ['/experiment='     hdr.experiment];
-  ['/cruise='         hdr.cruise];
-  ['/station='        hdr.station];
-  '/water_depth=NA';
-  ['/data_file_name=' hdr.raw_wfile];
-  ['/documents='      strjoin(hdr.documents.Level1b,',')];
-  ['/data_type='      hdr.data_type];
-  ['/data_status='    hdr.data_status.Level1b];
-  ['/start_date='     datemin];
-  ['/end_date='       datemax];
-  ['/start_time='     timemin '[GMT]'];
-  ['/end_time='       timemax '[GMT]'];
-  ['/north_latitude=' num2str(latmax) '[DEG]'];
-  ['/south_latitude=' num2str(latmin) '[DEG]'];
-  ['/east_longitude=' num2str(lonmax) '[DEG]'];
-  ['/west_longitude=' num2str(lonmin) '[DEG]'];
-  ['/missing='        hdr.missing];
-  ['/delimiter='      hdr.delimiter];
-  ['/instrument_manufacturer=' hdr.inst_mfr];
-  ['/instrument_model='        hdr.inst_model];
-  ['/calibration_files='       hdr.calfiles];
-  ['/calibration_date='        hdr.caldates];...
-  ['/associated_files=images,' assessed_id_file ',' original_file];...
+for nsb = 1:num_sb_files
+  if num_sb_files > 1
+    eventID_range = strcmp(UVP.eventID,eventIDs(nsb));
+    uvp = table2struct(UVP(eventID_range,:),'ToScalar',true);
+    eventID_sb = uvp.eventID{1};
+    uvp = rmfield(uvp,'eventID');
+    if isfield(uvp,'R2R_Event')
+      R2R_Event_sb = uvp.R2R_Event{1};
+      uvp = rmfield(uvp,'R2R_Event');
+    else
+      R2R_Event_sb = '';
+    end
+    add_headers ={['/eventID='  eventID_sb]; ['/R2R_Event='   R2R_Event_sb]};
+    
+  end
+  %% Generate SeaBASS header text
+  % Pull out raw filename
+  [~,original_file,ext] = fileparts(raw_rfile);
+  original_file = [original_file ext];
+  
+  % pull out max/min latitude, longitude, date, and time
+  latmax = num2str(max(uvp.lat));
+  latmin = min(uvp.lat);
+  lonmax = max(uvp.lon);
+  lonmin = min(uvp.lon);
+  
+  % Find the first and last date/time for SEABASS metadata header
+  % since odv2 table has already been sorted by datetime (early on), just
+  % pull out first and last
+  [~,imin] = min(str2double(uvp.date));
+  [~,imax] = max(str2double(uvp.date));
+  datemax = uvp.date{imax};
+  datemin = uvp.date{imin};
+  timemax = uvp.time{imax};
+  timemin = uvp.time{imin};
+  
+  volume_sampled_ml = num2str(str2double(raw.acq_volimage{1})*1000);  % Convert from L to mL
+  pixel_per_um      = raw.process_pixel{1};                           % already in micrometer
+  
+  % Generate seabass filename
+  if num_sb_files == 1
+    sb_filename = [hdr.raw_wfile '_' datemin '-' datemax '_' hdr.sb_release '.sb'];
+  else
+    sb_filename = [hdr.raw_wfile '_' datemin '_' erase(timemin,':') '_' hdr.sb_release '.sb'];
+  end
+ 
+  hdr_SEABASS={'/begin_header';
+    ['/investigators='  hdr.investigators];
+    ['/affiliations='   hdr.affiliations];
+    ['/contact='        hdr.contact];
+    ['/experiment='     hdr.experiment];
+    ['/cruise='         hdr.cruise];
+    ['/station='        hdr.station];
+    '/water_depth=NA';
+    ['/data_file_name=' sb_filename];
+    ['/documents='      strjoin(hdr.documents.Level1b,',')];
+    ['/data_type='      hdr.data_type];
+    ['/data_status='    hdr.data_status.Level1b];
+    ['/start_date='     datemin];
+    ['/end_date='       datemax];
+    ['/start_time='     timemin '[GMT]'];
+    ['/end_time='       timemax '[GMT]'];
+    ['/north_latitude=' num2str(latmax) '[DEG]'];
+    ['/south_latitude=' num2str(latmin) '[DEG]'];
+    ['/east_longitude=' num2str(lonmax) '[DEG]'];
+    ['/west_longitude=' num2str(lonmin) '[DEG]'];
+    ['/missing='        hdr.missing];
+    ['/delimiter='      hdr.delimiter];
+    ['/instrument_manufacturer=' hdr.inst_mfr];
+    ['/instrument_model='        hdr.inst_model];
+    ['/calibration_files='       hdr.calfiles];
+    ['/calibration_date='        hdr.caldates];...
+    ['/associated_files=images,' assessed_id_file ',' original_file];...
     '/associated_file_types=imaging_UVP,Assessed_IDs_list,raw';...
-  ['/volume_sampled_ml=' volume_sampled_ml];...
-  ['/volume_imaged_ml='  volume_sampled_ml];...
-  ['/pixel_per_um='      pixel_per_um];...
-  '/length_representation_instrument_varname=object_major*process_pixel';... % length_representation_instrument_varname (um): the instrument?s variable name equivalent to ?length_representation? (e.g., maxFeretDiameter).  
-  '/width_representation_instrument_varname=object_minor*process_pixel';...  % width_representation_instrument_varname (um): the instrument?s variable name equivalent to ?width_representation? (e.g., minFeretDiameter).   
-  '!'};
+    ['/volume_sampled_ml=' volume_sampled_ml];...
+    ['/volume_imaged_ml='  volume_sampled_ml];...
+    ['/pixel_per_um='      pixel_per_um];...
+    ['/associatedMedia_source=' hdr.ecotaxa_url]; % e.g. /associatedMedia_source=https://ecotaxa.obs-vlfr.fr/prj/1591
+    '/length_representation_instrument_varname=object_major_MULTIPLYBY_process_pixel';... % length_representation_instrument_varname (um): the instrument?s variable name equivalent to ?length_representation? (e.g., maxFeretDiameter).
+    '/width_representation_instrument_varname=object_minor_MULTIPLYBY_process_pixel';...  % width_representation_instrument_varname (um): the instrument?s variable name equivalent to ?width_representation? (e.g., minFeretDiameter).
+    '!'};
+  % Add eventID and R2R_Event to header 
+  if num_sb_files > 1
+    idx_add_after = find(contains(hdr_SEABASS,'west_longitude'));
+    hdr_SEABASS = [hdr_SEABASS(1:idx_add_after); add_headers; hdr_SEABASS(idx_add_after+1:end)];
+  end
+  % Insert comments, then finish with /fields and /units
+  hdr_SEABASS = [hdr_SEABASS; hdr.comments.Level1b;...
+    '!';...
+    ['/fields=' colstr];...
+    ['/units='  colunits];...
+    '/end_header'];
+  
+  % Add associated file with merged DAT information.
+  if isfield(hdr,'merged_dat_file')
+    hdr_SEABASS(contains(hdr_SEABASS,'associated_files='))      = strcat(hdr_SEABASS(contains(hdr_SEABASS,'associated_files=')),',',hdr.merged_dat_file);
+    hdr_SEABASS(contains(hdr_SEABASS,'associated_file_types=')) = strcat(hdr_SEABASS(contains(hdr_SEABASS,'associated_file_types=')),',metadata');
+  end
+  
+  % check if there is whitespace in any metadata headers
+  % whitespace in comments is OKAY
+  if any(contains(hdr_SEABASS,' ') & ~contains(hdr_SEABASS,'!'))
+    fprintf('White space in metadata header, must remove to pass fcheck\n')
+    keyboard
+  end
 
-% Insert comments, then finish with /fields and /units
-hdr_SEABASS = [hdr_SEABASS; hdr.comments.Level1b;...
-  '!';
-  ['/fields=' colstr];
-  ['/units='  colunits];
-  '/end_header'];
-
-% Add associated file with merged DAT information.
-if isfield(hdr,'merged_dat_file')
-  hdr_SEABASS(contains(hdr_SEABASS,'associated_files='))      = strcat(hdr_SEABASS(contains(hdr_SEABASS,'associated_files=')),',',hdr.merged_dat_file);
-  hdr_SEABASS(contains(hdr_SEABASS,'associated_file_types=')) = strcat(hdr_SEABASS(contains(hdr_SEABASS,'associated_file_types=')),',metadata');  
+  %% Format odv2 table to temporary variable to enable simply write to file
+  raw_write = table2cell(struct2table(uvp)); % convert to cell array to handle different variable types
+  raw_write = raw_write';            % transpose because fprintf function prints data columnwise
+  % convert NaNs to missing identifier
+  % raw_write(cellfun(@(x) isnumeric(x) && isnan(x), raw_write)) = {''}; % convert NaNs to '' for raw format
+  raw_write(cellfun(@(x) isnumeric(x) && isnan(x), raw_write)) = {str2double(hdr.missing)}; % missing=-9999 SeaBASS required header field
+  
+  %% Write raw table to file
+  if exist(sb_filename,'file')
+    fprintf('\n  Deleting data file: %s\n',sb_filename);
+    delete(sb_filename)
+  end
+  
+  fprintf('\n  Writing data in raw format to: %s\n',sb_filename);
+  fileID = fopen(sb_filename,'w');  % open file
+  if fileID < 0
+    fprintf(' *** Error opening file %s\n',sb_filename)
+    keyboard
+  end
+  fprintf(fileID,'%s\n',hdr_SEABASS{:});% write header
+  fprintf(fileID,fmt,raw_write{:});     % write data
+  fclose(fileID);                       % close file
+  
+ %% Write a smaller version for testing with fcheck
+ if num_sb_files == 1
+   raw_write_small = raw_write(:,1:200:end);
+   fprintf('\n  Writing data in raw format to: %s\n',strrep(sb_filename,'.sb','_fcheck.sb'));
+   fileID = fopen(strrep(sb_filename,'.sb','_fcheck.sb'),'w');  % open file
+   if fileID < 0
+     fprintf(' *** Error opening file %s\n',strrep(sb_filename,'.sb','_fcheck.sb'))
+     keyboard
+   end
+   fprintf(fileID,'%s\n',hdr_SEABASS{:});% write header
+   fprintf(fileID,fmt,raw_write_small{:});     % write data
+   fclose(fileID);                       % close file
+   % To troubleshoot why not printing correctly, comment above and just print to screen
+   % fprintf('%s\n',hdr_SEABASS{:}) % write header
+   % fprintf(fmt,raw_write{:})      % write data
+ end
 end
-
-% check if there is whitespace in any metadata headers
-% whitespace in comments is OKAY
-if any(contains(hdr_SEABASS,' ') & ~contains(hdr_SEABASS,'!'))
-  fprintf('White space in metadata header, must remove to pass fcheck\n')
-  keyboard
-end
-
-%% Format odv2 table to temporary variable to enable simply write to file
-raw_write = table2cell(struct2table(uvp)); % convert to cell array to handle different variable types
-raw_write = raw_write';            % transpose because fprintf function prints data columnwise
-% convert NaNs to missing identifier
-% raw_write(cellfun(@(x) isnumeric(x) && isnan(x), raw_write)) = {''}; % convert NaNs to '' for raw format
-raw_write(cellfun(@(x) isnumeric(x) && isnan(x), raw_write)) = {str2double(hdr.missing)}; % missing=-9999 SeaBASS required header field
-
-%% Write raw table to file
-if exist(raw_wfile,'file')
-  fprintf('\n  Deleting data file: %s\n',raw_wfile);
-  delete(raw_wfile)
-end
-
-fprintf('\n  Writing data in raw format to: %s\n',raw_wfile);
-fileID = fopen(raw_wfile,'w');  % open file
-if fileID < 0
-  fprintf(' *** Error opening file %s\n',raw_wfile)
-  keyboard
-end
-fprintf(fileID,'%s\n',hdr_SEABASS{:});% write header
-fprintf(fileID,fmt,raw_write{:});     % write data
-fclose(fileID);                       % close file
-
-% Write a smaller version for testing with fcheck
-raw_write_small = raw_write(:,1:200:end);
-fprintf('\n  Writing data in raw format to: %s\n',strrep(raw_wfile,'.sb','_fcheck.sb'));
-fileID = fopen(strrep(raw_wfile,'.sb','_fcheck.sb'),'w');  % open file
-if fileID < 0
-  fprintf(' *** Error opening file %s\n',strrep(raw_wfile,'.sb','_fcheck.sb'))
-  keyboard
-end
-fprintf(fileID,'%s\n',hdr_SEABASS{:});% write header
-fprintf(fileID,fmt,raw_write_small{:});     % write data
-fclose(fileID);                       % close file
-% To troubleshoot why not printing correctly, comment above and just print to screen
-% fprintf('%s\n',hdr_SEABASS{:}) % write header
-% fprintf(fmt,raw_write{:})      % write data
-
 %% List of assessed IDs for automated and/or manual classification 
 % Providing a list of all scientificName/scientificNameID pairs assessed by
 % the automated classifier with the data submission enables the
@@ -581,13 +651,16 @@ fclose(fileID);                       % close file
 
 assessed = struct();
 [~,idx_unique] = unique(uvp.data_provider_category_manual,'stable');
-assessed.data_provider_category_manual    = uvp.data_provider_category_manual(idx_unique);
+assessed.data_provider_category_manual = uvp.data_provider_category_manual(idx_unique);
 if isfield(uvp,'data_provider_category_automated')
   assessed.data_provider_category_automated = uvp.data_provider_category_automated(idx_unique);
 end
 assessed.scientificName_manual   = uvp.scientificName_manual(idx_unique);
 assessed.scientificNameID_manual = uvp.scientificNameID_manual(idx_unique);
-
+% add hierarchy to assess file because it was not allowed to stay in the
+% "data_provider_category_manual" field.
+assessed.data_provider_category_manual_annotation_hierarchy = raw.object_annotation_hierarchy(idx_unique);
+% assessed.data_provider_category_manual_classification = 
 assessed = struct2table(assessed);
 writetable(assessed,fullfile(projectdir,assessed_id_file),'Delimiter',',');
 

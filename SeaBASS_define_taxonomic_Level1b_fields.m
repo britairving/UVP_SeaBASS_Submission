@@ -42,30 +42,39 @@ function fields = SeaBASS_define_taxonomic_Level1b_fields
 %  Brita Irving <bkirving@alaska.edu>
 %% The following is a list of field names (i.e., measurement labels) that align with Darwin Core when possible.
 fields = struct();
-
-fields.station.description = 'Sample station';
-fields.station.requirement = 'optional'; %
-fields.station.units       = 'none'; 
-fields.station.rawfield    = 'sample_stationid'; % e.g. "ss1" "ls_18" "wire_walker_calibration_-_3"
-
-fields.station_alt_id.description = 'Alternate sample station identifier (use ONLY if station has already been used as a field name)';
-fields.station_alt_id.requirement = 'optional';
-fields.station_alt_id.units       = 'none';
-fields.station_alt_id.rawfield    = 'sample_id'; % e.g. ctd001
-
-
+% Per instructions from Inia Soto Ramos, change
+% 1. eventID must be the original object id (for example: ctd000_1). This may
+%    remove the use of two columns for station and station_alt_id.
+% 2. The image/vignette (currently under eventID) will be included in the
+%   dataset. For now, instead of eventID use field name instrument_imageID
+%   (units=none). That field name may change by the time you resubmit, but
+%   I can do that here. We reached out to some of our colleagues with more
+%   experience with DarwinCore, to help us find a better naming convention.
 fields.eventID.description = 'A unique identifier associated with the sample as an event';
 fields.eventID.requirement = 'optional'; %
 fields.eventID.units       = 'none'; 
-fields.eventID.rawfield    = 'object_rawvig'; % This is the same as station_alt_id in the Level2 ZOO file
+fields.eventID.rawfield    = 'sample_id'; % This is the same as station_alt_id in the Level2 ZOO file
+% fields.station.description = 'Sample station';
+% fields.station.requirement = 'optional'; %
+% fields.station.units       = 'none'; 
+% fields.station.rawfield    = 'sample_stationid'; % e.g. "ss1" "ls_18" "wire_walker_calibration_-_3"
+% 
+% fields.station_alt_id.description = 'Alternate sample station identifier (use ONLY if station has already been used as a field name)';
+% fields.station_alt_id.requirement = 'optional';
+% fields.station_alt_id.units       = 'none';
+% fields.station_alt_id.rawfield    = 'sample_id'; % e.g. ctd001
 
+fields.instrument_imageID .description = 'A unique identifier associated with the sample as an event';
+fields.instrument_imageID .requirement = 'optional'; %
+fields.instrument_imageID .units       = 'none'; 
+fields.instrument_imageID .rawfield    = 'object_rawvig'; % This is the same as station_alt_id in the Level2 ZOO file
 
 % Fields not listed in SeaBASS wiki on plankton_and_particles (see
 % comments) but important to note
 fields.depth.description = 'Depth of measurement';
 fields.depth.requirement = 'optional'; %
 fields.depth.units       = 'm'; 
-fields.depth.calculate   = 'raw.object_depth_min+1.2'; % Note that there is a 1.2 m difference in the depth between the two bases (depth transmitted to ecotaxa images is the depth recorded by the sensor which is 1.2m above the imaged zone /// ecotaxa particles does this correction but not the image module)
+fields.depth.calculate   = 'str2double(raw.object_depth_min)+1.2'; % Note that there is a 1.2 m difference in the depth between the two bases (depth transmitted to ecotaxa images is the depth recorded by the sensor which is 1.2m above the imaged zone /// ecotaxa particles does this correction but not the image module)
 
 fields.lat.description = 'Sample latitude (decimal fractions; -90 to 90)';
 fields.lat.requirement = 'optional'; %
@@ -99,10 +108,11 @@ fields.associatedMedia.requirement = 'required';
 fields.associatedMedia.units       = 'none';
 fields.associatedMedia.rawfield    = 'img_file_name'; % e.g. images/Annelida/106749790_0.jpg - path to the image
 
-fields.associatedMedia_source.description = 'a unique persistent URL pointing to the landing page for a water sample from which multiple ROIs are derived';
-fields.associatedMedia_source.requirement = 'optional';
-fields.associatedMedia_source.units       = 'none';
-fields.associatedMedia_source.calculate   = 'extractBefore(raw.object_rawvig,19)'; % e.g. '20180811192720_032' from '20180811192720_032_0001'
+% % Removing associatedMedia_source per Inia Soto Ramos's instruction Aug21
+%fields.associatedMedia_source.description = 'a unique persistent URL pointing to the landing page for a water sample from which multiple ROIs are derived';
+%fields.associatedMedia_source.requirement = 'optional';
+%fields.associatedMedia_source.units       = 'none';
+%fields.associatedMedia_source.calculate   = 'extractBefore(raw.object_rawvig,19)'; % e.g. '20180811192720_032' from '20180811192720_032_0001'
 
 % From Dr. Aimee Neeley
 % I think Brita has the right idea generally. I would suggest she put
@@ -155,22 +165,22 @@ fields.scientificNameID_manual.rawfield    = 'scientificNameID';
 fields.area_cross_section.description = 'Cross-sectional area of the target detected within the ROI determined by means specified in the image processing method or protocol document.';
 fields.area_cross_section.requirement = 'required'; %
 fields.area_cross_section.units       = 'um^2';  
-fields.area_cross_section.calculate   = "raw.object_area .* str2double(raw.process_pixel)";
+fields.area_cross_section.calculate   = "str2double(raw.object_area) .* str2double(raw.process_pixel)";
 
 fields.length_representation.description = 'Representation of length of the target detected within the ROI or largest mesh size for which the target could be retained, determined by means specified in the image processing method or protocol document.';
 fields.length_representation.requirement = 'required'; %
 fields.length_representation.units       = 'um'; 
-fields.length_representation.calculate   = "raw.object_major .* str2double(raw.process_pixel)"; % object_major(primary axis of the best fitting ellipse for the object in pixel)*process_pixel(pixel size in ?m)
+fields.length_representation.calculate   = "str2double(raw.object_major) .* str2double(raw.process_pixel)"; % object_major(primary axis of the best fitting ellipse for the object in pixel)*process_pixel(pixel size in ?m)
 
 fields.width_representation.description = 'Representation of width of the target detected within the ROI or smallest mesh size through which the target could pass, determined by means specified in the image processing method or protocol document.';
 fields.width_representation.requirement = 'required'; %
 fields.width_representation.units       = 'um'; 
-fields.width_representation.calculate   = "raw.object_minor .* str2double(raw.process_pixel)";  % object_minor(secondary axis of the best fitting ellipse for the object in pixel)*process_pixel(pixel size in ?m)
+fields.width_representation.calculate   = "str2double(raw.object_minor) .* str2double(raw.process_pixel)";  % object_minor(secondary axis of the best fitting ellipse for the object in pixel)*process_pixel(pixel size in ?m)
 
 fields.equivalent_spherical_diameter.description = 'Equivalent spherical diameter of the target detected within the ROI determined by means specified in the image processing method or protocol document.';
 fields.equivalent_spherical_diameter.requirement = 'optional'; %
 fields.equivalent_spherical_diameter.units       = 'um'; 
-fields.equivalent_spherical_diameter.calculate   = "raw.object_esd .* str2double(raw.process_pixel)"; % object_esd(!!!assuming this is equivalent spherical diameter in pixels!!!)*process_pixel(pixel size in ?m)
+fields.equivalent_spherical_diameter.calculate   = "str2double(raw.object_esd) .* str2double(raw.process_pixel)"; % object_esd(!!!assuming this is equivalent spherical diameter in pixels!!!)*process_pixel(pixel size in ?m)
 
 % fields.area_based_diameter.description = 'Area-based diameter of the target detected within the ROI determined by means specified in the image processing method or protocol document.';      
 % fields.area_based_diameter.requirement = 'optional'; %
@@ -182,8 +192,8 @@ fields.biovolume.requirement = 'required'; %
 fields.biovolume.units       = 'um^3';  
 fields.biovolume.calculate   = '(pi/6).*uvp.length_representation.*uvp.width_representation.^2'; % Let's calculate biovolume for each ROI by using major and minor axis dimensions from Ecotaxa (object_major, object_minor) and assuming they are prolate spheroids.  In that case, biovolume=(pi/6)*object_major*object_minor^2.
 
-% fields.biovolume.calculate   = "4/3 .* pi .* uvp.area_based_diameter.^3";           % Need to figure this out!!!
-% fields.biovolume.calculate   = "raw.object_circ_.^3 ./ (6*pi^2)";
+% fields.biovolume.calculate   = "4/3 .* pi .* uvp.area_based_diamete).^3";           % Need to figure this out!!!
+% fields.biovolume.calculate   = "str2double(raw.object_circ_).^3 ./ (6*pi^2)";
 % fields.biovolume.calculate   = "4/3 .* pi .* uvp.equivalent_spherical_diameter.^3"; % Need to figure this out
 
 % Below are Required in the file header or as a field
