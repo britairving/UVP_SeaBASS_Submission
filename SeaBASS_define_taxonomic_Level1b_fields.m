@@ -64,10 +64,13 @@ fields.eventID.rawfield    = 'sample_id'; % This is the same as station_alt_id i
 % fields.station_alt_id.units       = 'none';
 % fields.station_alt_id.rawfield    = 'sample_id'; % e.g. ctd001
 
-fields.instrument_imageID .description = 'A unique identifier associated with the sample as an event';
-fields.instrument_imageID .requirement = 'optional'; %
-fields.instrument_imageID .units       = 'none'; 
-fields.instrument_imageID .rawfield    = 'object_rawvig'; % This is the same as station_alt_id in the Level2 ZOO file
+% Changing instrument_imageID to catalogNumber per NASA recommendation, and
+% per darwin cor/OBIS team recommending, adding cruise name to make it
+% globally unique.
+fields.catalogNumber.description = 'A globally unique identifier associated with the sample as an event';
+fields.catalogNumber.requirement = 'optional'; %
+fields.catalogNumber.units       = 'none'; 
+fields.catalogNumber.calculate   = 'strcat(cruiseid,''_'',raw.object_rawvig)'; % 
 
 % Fields not listed in SeaBASS wiki on plankton_and_particles (see
 % comments) but important to note

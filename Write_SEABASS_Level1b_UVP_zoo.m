@@ -42,7 +42,7 @@ function Write_SEABASS_Level1b_UVP_zoo
 %   identifier in WoRMS. In the above example, 345868 represents the taxon
 %   identifier (AphiaID) in WoRMS for the Subclass Phaeodaria.
 %
-%   AphiaID?s are used to generate the scientificNameID, and if no AphiaID
+%   AphiaID's are used to generate the scientificNameID, and if no AphiaID
 %   match is found for a living item, the scientificNameID was generated
 %   with the Algae Base id for Eukaryota (i.e.
 %   urn:lsid:algaebase.org:taxname:86701).
@@ -466,6 +466,33 @@ uvp.data_provider_category_manual = raw.child_name;
 % %   end
 % % end
 
+%% Replace all white space with underscore
+% for example: rhizaria like, double sphere, ctenophora sp, rhizaria X sp
+uvp_fields = fieldnames(uvp);
+for nf = 1:numel(uvp_fields)
+  sf = uvp_fields{nf};
+  if iscell(uvp.(sf))
+    uvp.(sf) = strrep(uvp.(sf),' ','_');
+  end
+end
+
+%% Now change the folder names in the /images/{folder names} as well
+image_dir = fullfile(projectdir,hdr.ecotaxaf,'images');
+if ~isfolder(image_dir) && any(contains(raw.child_name,' '))
+  fprintf('**ERROR** folders containing images of taxa contains spaces, need to replace these with underscores!\n')
+  fprintf('  BUT.... cannot find correct /image folder to automatically change those folder names\n')
+  fprintf('  stopped here in keyboard mode .. you need to investigate and build folder path appropriately\n')
+  fprintf('  currently looked in fullfile(projectdir,hdr.ecotaxaf,"images") = %s\n',image_dir);
+  keyboard
+elseif any(contains(raw.child_name,' '))
+  image_folders = dir(image_dir);
+  image_fnames  = {image_folders.name};
+  rename_folders = image_fnames(contains(image_fnames,' '));
+  for rn = 1:numel(rename_folders)
+    movefile(fullfile(image_dir,rename_folders{rn}),fullfile(image_dir,strrep(rename_folders{rn},' ','_')));
+  end
+end
+  
 
 %% Write single sb file for entire dataset, or split by eventID
 if cfg.single_sb_file
@@ -547,7 +574,7 @@ for nsb = 1:num_sb_files
     ['/station='        hdr.station];
     '/water_depth=NA';
     ['/data_file_name=' sb_filename];
-    ['/documents='      strjoin(hdr.documents.Level1b,',')];
+    ['/documents='      strjoin(hdr.documents.Level1b,',') ',' assessed_id_file];
     ['/data_type='      hdr.data_type];
     ['/data_status='    hdr.data_status.Level1b];
     ['/start_date='     datemin];
@@ -564,8 +591,8 @@ for nsb = 1:num_sb_files
     ['/instrument_model='        hdr.inst_model];
     ['/calibration_files='       hdr.calfiles];
     ['/calibration_date='        hdr.caldates];...
-    ['/associated_files=images,' assessed_id_file ',' original_file];...
-    '/associated_file_types=imaging_UVP,Assessed_IDs_list,raw';...
+    ['/associated_files='  strcat(hdr.raw_wfile,'_images.tar.gz') ',' original_file];...
+    '/associated_file_types=planktonic,raw';...
     ['/volume_sampled_ml=' volume_sampled_ml];...
     ['/volume_imaged_ml='  volume_sampled_ml];...
     ['/pixel_per_um='      pixel_per_um];...
