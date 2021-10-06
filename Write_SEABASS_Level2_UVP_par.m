@@ -28,14 +28,21 @@ function Write_SEABASS_Level2_UVP_par
 include_uncertainty = 0; % 1 = writes uncertainty estimate to file, 0 = does not include uncertainty variables, but does include text on how to include it.
 
 %% Define read and write filenames
-%% EXPORTSNP survey cruise on the Sally Ride
-cruiseid = 'SR1812'; 
+%% EXPORTSNA survey cruise on the Discovery
+cruiseid = 'DY131'; 
 projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 
-odv_rfile = fullfile(projectdir,'export_detailed_20210201_19_26','export_detailed_20210201_19_26_PAR_odv.txt');
-sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_survey_20180814-20180909_R1.sb';
-r2r_elog  = fullfile(projectdir,'R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx');
+odv_rfile = fullfile(projectdir,'export_detailed_20211005_18_58','export_detailed_20211005_18_58_PAR_odv.txt');
+sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_survey_20210504-20210529_R1.sb';
+r2r_elog  = fullfile(projectdir,'R2R_ELOG_dy131_FINAL_EVENTLOG_20210601_094434_EDITED.csv');
 
+%% EXPORTSNP survey cruise on the Sally Ride
+% cruiseid = 'SR1812'; 
+% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
+% 
+% odv_rfile = fullfile(projectdir,'export_detailed_20210201_19_26','export_detailed_20210201_19_26_PAR_odv.txt');
+% sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_survey_20180814-20180909_R1.sb';
+% r2r_elog  = fullfile(projectdir,'R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx');
 
 %% EXPORTSNP process cruise on the Roger Revelle
 % cruiseid = 'RR1813'; 
@@ -146,72 +153,17 @@ table_options.VariableNames{contains(table_options.VariableNames,'Depth_m')} = '
 odv = readtable(odv_rfile,table_options);
 
 %% Read R2R eventlog
-try
-  r2r = readtable(r2r_elog,'FileType','spreadsheet');
-  % Initialize r2r event field
-  odv.R2R_Event = cell(size(odv.cruise));
-  %odv.r2r_cast  = cell(size(odv.cruise));
-  cols = [cols, 'R2R_Event'];
-  % Pull out r2r event based on matching event
-  switch cruiseid
-    case 'SR1812'
-      [rawfilenames,iu] = unique(odv.rawfilename);
-      % remove empty entry (necessary because odv format only has single
-      % entry per profile
-      if isempty(rawfilenames{1})
-        rawfilenames(1) = [];
-        iu(1) = [];
-      end
-      % pull out profiles from uvp data
-      profiles = erase(odv.profile(iu),{'ctd00' 'ctd0' 'ctd'});
-      % loop through profiles/rawfilenames and pull out r2revent
-      for nr = 1:numel(rawfilenames)
-        % math by UVP rawfilename, then station or cast
-        mtch = contains(r2r.Comment,rawfilenames{nr}) & ...
-          ( strcmp(strrep(r2r.Station,' ','_'),odv.site{iu(nr)}) | strcmp(r2r.Cast,profiles{nr}) );
-        if sum(mtch) == 1
-          odv.R2R_Event{iu(nr)} = r2r.R2R_Event{mtch};
-          %odv.r2r_cast{iu(nr)} = r2r.Cast{mtch};
-        else
-          fprintf('r2r event not found, stopping here\n')
-          keyboard
-        end
-      end
-    case 'RR1813'
-      [sites,iu] = unique(odv.site);
-      % remove empty entry (necessary because odv format only has single
-      % entry per profile
-      if isempty(sites{1})
-        sites(1) = [];
-        iu(1) = [];
-      end
-      % pull out profiles from uvp data
-      profiles1 = erase(odv.profile(iu),{'export00' 'export0' 'export'});
-      profiles2 = strcat('SIO_',pad(profiles1,3,'left','0'));
-      % loop through profiles/rawfilenames and pull out r2revent
-      for nr = 1:numel(sites)
-        sdate = sites{nr}(1:8);
-        % math by UVP rawfilename, then station or cast
-        mtch = contains(r2r.Event,sites{nr}) | contains(r2r.R2R_Event,sites{nr});
-        if sum(mtch) ~= 1
-          mtch = contains(r2r.Event,sdate) & contains(r2r.Instrument,'CTD911') & ( strcmp(r2r.Cast,profiles1{nr}) | strcmp(r2r.Cast,profiles2{nr}) );
-        end
-        if sum(mtch) ~= 1
-          % for most of the casts, r2r event log has casts as some
-          % combindation of SIO and sequential cast number.
-          mtch = contains(r2r.Event,sdate) & contains(r2r.Instrument,'CTD911') & contains(r2r.Cast,'SIO','IgnoreCase',true) & contains(r2r.Cast,profiles1{nr}) ;
-        end
-        % set r2r event
-        odv.R2R_Event{iu(nr)} = r2r.R2R_Event{mtch};
-        %odv.r2r_cast{iu(nr)}  = r2r.Cast{mtch};
-      end
-    otherwise
-      fprintf('R2R event log not match up yet, ignoring for now\n')
-      odv.R2R_Event = [];
+if exist(r2r_elog,'file')
+  try
+    % Read in R2R event log and pull out r2r event for each cast
+    odv = UVP_merge_R2R(odv,r2r_elog,cruiseid);
+    % Add R2R_Event to columns
+    cols = [cols, 'R2R_Event'];
+  catch
+    fprintf('Could not read R2R event log file, ignoring for now\n')
   end
-catch
-  fprintf('Could not read R2R event log file, ignoring for now\n')
 end
+
 
 %% Define new table
 % this is just to preserve original data so any manipulations can be
@@ -249,6 +201,7 @@ for irm = meta_idx(end)+1:size(odv2,2)
   end
 end
 
+keyboard
 %% DO NOT DELETE 50.8-64_? and higher size classes
 % The 50.8-64_? size bin will be kept, even if no real values in the field.
 % Detection limit for UVP is approximately 100 micrometer but there is
