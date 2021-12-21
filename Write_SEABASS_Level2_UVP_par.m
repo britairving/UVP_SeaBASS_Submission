@@ -26,15 +26,23 @@ function Write_SEABASS_Level2_UVP_par
 %  Andrew McDonnell <amcdonnell@alaska.edu>
 %% Define script options
 include_uncertainty = 0; % 1 = writes uncertainty estimate to file, 0 = does not include uncertainty variables, but does include text on how to include it.
-
 %% Define read and write filenames
-%% EXPORTSNA survey cruise on the Discovery
-cruiseid = 'DY131'; 
-projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 
-odv_rfile = fullfile(projectdir,'export_detailed_20211005_18_58','export_detailed_20211005_18_58_PAR_odv.txt');
-sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_survey_20210504-20210529_R1.sb';
-r2r_elog  = fullfile(projectdir,'R2R_ELOG_dy131_FINAL_EVENTLOG_20210601_094434_EDITED.csv');
+%% EXPORTSNA cruise on the Sarmiento De Gamboa
+cruiseid = 'SG2105'; 
+projectdir = fullfile('D:\MATLAB\UVP_project_data\',cruiseid);
+
+odv_rfile = fullfile(projectdir,'export_detailed_20211110_11_26','export_detailed_20211110_11_26_PAR_odv.txt');
+sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
+r2r_elog  = fullfile(projectdir,'EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx');
+
+%% EXPORTSNA survey cruise on the Discovery
+% cruiseid = 'DY131'; 
+% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
+% 
+% odv_rfile = fullfile(projectdir,'export_detailed_20211005_18_58','export_detailed_20211005_18_58_PAR_odv.txt');
+% sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_survey_20210504-20210529_R1.sb';
+% r2r_elog  = fullfile(projectdir,'R2R_ELOG_dy131_FINAL_EVENTLOG_20210601_094434_EDITED.csv');
 
 %% EXPORTSNP survey cruise on the Sally Ride
 % cruiseid = 'SR1812'; 
@@ -201,7 +209,6 @@ for irm = meta_idx(end)+1:size(odv2,2)
   end
 end
 
-keyboard
 %% DO NOT DELETE 50.8-64_? and higher size classes
 % The 50.8-64_? size bin will be kept, even if no real values in the field.
 % Detection limit for UVP is approximately 100 micrometer but there is
@@ -833,6 +840,6 @@ fclose(fileID);                 % close file
 %fprintf('%s\n',hdr_SEABASS{:}) % write header
 %fprintf(fmt,odv_write{:})      % write data
 
-fprintf('workflow is finished\n')
 
+fprintf('workflow is finished\n')
 end %% MAIN FUNCTION

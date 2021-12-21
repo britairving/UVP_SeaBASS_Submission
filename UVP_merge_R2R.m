@@ -5,6 +5,7 @@ function odv = UVP_merge_R2R(odv,r2r_elog,cruiseid)
 %
 % Authors:
 %  Brita Irving <bkirving@alaska.edu>
+
 %% Read R2R log
   if contains(r2r_elog,'.xlsx')
     r2r = readtable(r2r_elog,'FileType','spreadsheet');
@@ -69,6 +70,53 @@ function odv = UVP_merge_R2R(odv,r2r_elog,cruiseid)
         odv.R2R_Event{iu(nr)} = r2r.R2R_Event{mtch};
         %odv.r2r_cast{iu(nr)}  = r2r.Cast{mtch};
       end
+    %% SG2105 - EXPORTS North Atlantic SdG Sarmiento de Gamboa cruise
+    case 'SG2105'
+      try
+        % store lat and long to check
+        R2R_Latitude  = nan(size(odv.cruise));
+        R2R_Longitude = nan(size(odv.cruise));
+        [sites,iu] = unique(odv.site,'stable');
+        
+        % remove empty entry (necessary because odv format only has single
+        % entry per profile
+        if any(strcmp(sites,'') == 1)
+          rm_empty = strcmp(sites,'');
+          sites(rm_empty) = [];
+          iu(rm_empty) = [];
+        end
+        % pull out profiles from uvp data
+        profiles1 = erase(odv.profile(iu),{'sg2105_00' 'sg2105_0' 'sg2105_'});
+        % loop through profiles and pull out r2revent
+        for nr = 1:numel(sites)
+          % math by UVP rawfilename, then station or cast
+          mtch = strcmp(r2r.Cast,profiles1{nr}) & strcmp(r2r.Instrument,'CTD911');
+          if sum(mtch) == 1
+            odv.R2R_Event{iu(nr)} = r2r.Event{mtch};
+            odv.R2R_Station{iu(nr)} = r2r.Station{mtch};
+            % replace UVP latitude/longitude with R2R lat lon
+            odv.latitude(iu(nr))  = r2r.Latitude(mtch);
+            odv.longitude(iu(nr)) = r2r.Longitude(mtch);
+          elseif sum(mtch) >= 2
+            mtch = strcmp(r2r.Cast,profiles1{nr}) & strcmp(r2r.Instrument,'CTD911') & strcmp(r2r.Action,'deploy');
+            if sum(mtch) > 1
+              mtch = find(mtch == 1,1,'last');
+            end
+            odv.R2R_Event{iu(nr)}   = r2r.Event{mtch};
+            odv.R2R_Station{iu(nr)} = r2r.Station{mtch};
+            % replace UVP latitude/longitude with R2R lat lon
+            odv.latitude(iu(nr))  = r2r.Latitude(mtch);
+            odv.longitude(iu(nr)) = r2r.Longitude(mtch);
+          else
+            fprintf('r2r event not found, stopping here\n')
+            keyboard
+          end
+        end
+      catch
+        keyboard
+      end
+      % Remove R2R_Station 
+      odv.R2R_Station = [];
     %% DY131 - EXPORTS North Atlantic Survey ship RRS Discovery  
     case 'DY131'
       try
