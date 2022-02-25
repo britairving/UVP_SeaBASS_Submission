@@ -88,8 +88,9 @@ function Write_SEABASS_Level1b_UVP_zoo
 %  Brita Irving     <bkirving@alaska.edu>
 
 %% ** USER INPUT REQUIRED ** > Define cruise ID
-cruiseid = 'SR1812';% EXPORTSNP survey cruise R/V Sally Ride
-%cruiseid = 'RR1813';% EXPORTSNP process cruise R/V Roger Revelle
+%cruiseid = 'SR1812';% EXPORTSNP survey cruise R/V Sally Ride 2018
+%cruiseid = 'RR1813';% EXPORTSNP process cruise R/V Roger Revelle 2018
+cruiseid = 'DY131';% EXPORTSNA survey cruise R/V Discovery 2021
 
 %% ** USER INPUT REQUIRED ** > Define project directory
 if ismac 

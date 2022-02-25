@@ -28,37 +28,39 @@ function Write_SEABASS_Level2_UVP_par
 include_uncertainty = 0; % 1 = writes uncertainty estimate to file, 0 = does not include uncertainty variables, but does include text on how to include it.
 %% Define read and write filenames
 
-%% EXPORTSNA cruise on the Sarmiento De Gamboa
-cruiseid = 'SG2105'; 
-projectdir = fullfile('D:\MATLAB\UVP_project_data\',cruiseid);
 
-odv_rfile = fullfile(projectdir,'export_detailed_20211110_11_26','export_detailed_20211110_11_26_PAR_odv.txt');
-sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
-r2r_elog  = fullfile(projectdir,'EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx');
+%% EXPORTSNA cruise on the Sarmiento De Gamboa
+% cruiseid = 'SG2105'; 
+% odv_rfile = fullfile(projectdir,'export_detailed_20211110_11_26','export_detailed_20211110_11_26_PAR_odv.txt');
+% sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
+% r2r_elog  = fullfile(projectdir,'EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx');
 
 %% EXPORTSNA survey cruise on the Discovery
-% cruiseid = 'DY131'; 
-% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
-% 
-% odv_rfile = fullfile(projectdir,'export_detailed_20211005_18_58','export_detailed_20211005_18_58_PAR_odv.txt');
-% sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_survey_20210504-20210529_R1.sb';
-% r2r_elog  = fullfile(projectdir,'R2R_ELOG_dy131_FINAL_EVENTLOG_20210601_094434_EDITED.csv');
+cruiseid = 'DY131'; 
+odv_rfile = fullfile('export_detailed_20220224_21_05','export_detailed_20220224_21_05_PAR_odv.txt');
+sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_survey_20210504-20210529_R1.sb';
+r2r_elog  = 'R2R_ELOG_dy131_FINAL_EVENTLOG_20210601_094434_EDITED.csv';
 
 %% EXPORTSNP survey cruise on the Sally Ride
 % cruiseid = 'SR1812'; 
-% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
-% 
 % odv_rfile = fullfile(projectdir,'export_detailed_20210201_19_26','export_detailed_20210201_19_26_PAR_odv.txt');
 % sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_survey_20180814-20180909_R1.sb';
 % r2r_elog  = fullfile(projectdir,'R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx');
 
 %% EXPORTSNP process cruise on the Roger Revelle
-% cruiseid = 'RR1813'; 
-% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
-% 
+% cruiseid = 'RR1813'; % 
 % odv_rfile = fullfile(projectdir,'export_detailed_20210128_08_11','export_detailed_20210128_08_11_PAR_odv.txt');
 % sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_process_20180814-20180909_R1.sb';
 % r2r_elog  = fullfile(projectdir,'R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx');
+
+%% Specify full path
+if ismac 
+  projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
+else
+  projectdir = fullfile('D:','MATLAB','UVP_project_data',cruiseid);
+end
+odv_rfile = fullfile(projectdir,odv_rfile);
+r2r_elog  = fullfile(projectdir,r2r_elog);
 
 %% Specify write filename
 % Release number R0 suggested if data_type=preliminary
@@ -165,6 +167,9 @@ if exist(r2r_elog,'file')
   try
     % Read in R2R event log and pull out r2r event for each cast
     odv = UVP_merge_R2R(odv,r2r_elog,cruiseid);
+    if ismember('R2R_Station',odv.Properties.VariableNames)
+      odv.R2R_Station = [];
+    end
     % Add R2R_Event to columns
     cols = [cols, 'R2R_Event'];
   catch
@@ -261,7 +266,9 @@ i_date     = find(strcmp(odv2.Properties.VariableNames,'date'));
 i_time     = find(strcmp(odv2.Properties.VariableNames,'time'));
 new_order  = [1:i_datetime i_date i_time i_datetime+1:ncols];
 % Reorder cell array with full column names
+
 cols2 = cols2(new_order); % replaced cols2=[cols2(1,1:dt-1) , cols2(1,d) , cols2(1,d+1) , cols2(1,dt+1:d-1) , cols2(1,d+2:end)];
+ 
 % added catch for older versions of MATLAB
 % kept method for R2018a for posterity sake
 try % movevars introduced in R2018a
@@ -277,8 +284,6 @@ end
 odv2.datetime = [];
 cols2(i_datetime) = [];
 cols2(end-1:end) = []; % original date and time variables at the end
-
-
 % Now move r2r event to just after depth
 if ismember('R2R_Event',cols2)
   ncols = numel(odv2.Properties.VariableNames);
