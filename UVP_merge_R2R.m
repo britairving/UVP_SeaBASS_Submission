@@ -72,6 +72,8 @@ function odv = UVP_merge_R2R(odv,r2r_elog,cruiseid)
       end
     %% SG2105 - EXPORTS North Atlantic SdG Sarmiento de Gamboa cruise
     case 'SG2105'
+      % NOTE 'SG2105_UVP6' -- UVP6 LP deployed on float TZEX, R2R_Event     '20210507.0713.001'    2.0211e+07     '07-May-2021 07:12:57'    'TZEX'                           'other'              NaN       'NaN'       'NaN'      48.945      -14.825     ''            'eCeballos-Romero1'    'Surface deploy and recovery test'                                                           
+
       try
         % store lat and long to check
         R2R_Latitude  = nan(size(odv.cruise));
