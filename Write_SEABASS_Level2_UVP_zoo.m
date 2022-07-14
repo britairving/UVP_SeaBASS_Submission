@@ -8,35 +8,65 @@ function Write_SEABASS_Level2_UVP_zoo
 %   This will be Level 2 data (abundance and biovolumes)
 %
 % Steps:
-%   1. Read in detailed ODV ZOO file
-%   2. Format fields and column names following SeaBASS format
-%   3. Define metadata header that will be printed to .sb file
-%   4. Write sb file with all taxonomic data
+%   1. USER writes metadata m file to define SeaBASS required headers
+%      format: {cruiseid}_UVP_metadata.m
+%   2. USER defines projectdir, cruiseid, odv_rfile (read file), sb_wfile 
+%      (write file), and r2r_elog (if available and must edit 
+%      UVP_merge_R2R.m for cruise specific r2r log formatting).
+%   3. Script reads in detailed ODV ZOO file
+%   4. Script formats fields and column names following SeaBASS format
+%   5. Script queries WoRMS database for taxa scientificNames and scientificNameIDs
+%   6. Script formats metadata header that will be printed to .sb file
+%   7. Script writes sb file with all taxonomic data
 %
 % References:
 %  Picheral M, Colin S, Irisson J-O (2017). EcoTaxa, a tool for the
 %  taxonomic classification of images. http://ecotaxa.obs-vlfr.fr.
 %
+%  Neeley, A., S. Beaulieu, C. Proctor, I. Cetinic, J. Futrelle, I.
+%  Ramos-Santos, H. Sosik, E. Devred, L. Karp-Boss, M. Picheral, N.
+%  Poulton, C. Roesler, and A. Shepherd. (2021) Standards and practices for
+%  reporting plankton and other particle observations from images. 38 pp.
+%  DOI:10.1575/1912/27377
+%
+% Code availabile: https://github.com/britairving/UVP_submission_formatting
+%
 % Author:
 %  Brita Irving <bkirving@alaska.edu>
-%  Andrew McDonnell <amcdonnell@alaska.edu>
+%  with input from 
+%     Andrew McDonnell <amcdonnell@alaska.edu>
+%     Emmanuel Boss    <emmanuel.boss@maine.edu>
+%     Lee Karp-Boss    <lee.karp-boss@maine.edu>
 %% Uncertainty description
-cfg.include_uncertainty_description = 1; % 1 = uncertainty description written to file
+cfg.include_uncertainty_description = 1; % 1 = uncertainty description written to file header
 cfg.remove_temporary_fields         = 0; % 1 = removes all temporary fields from odv data before writting
-cfg.limit_to_taxa = {'Salpida' 't008'};  % Cell array with limited taxa names
 
 %% Define read and write filenames
+%% EXPORTSNA cruise on the Sarmiento De Gamboa UVP6-LP deployed on a float
+cruiseid  = 'SG2105_UVP6'; 
+odv_rfile = fullfile('export_detailed_20220628_22_58','export_detailed_20220628_22_58_ZOO_odv.txt');
+sb_wfile  = 'EXPORTS-EXPORTSNA_UVP6-TaxonomicLevel2_sdg_20210504-20210519_R1.sb';
+r2r_elog  = 'EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx';
+
 %% EXPORTSNP survey cruise R/V Sally Ride
-cruiseid = 'SR1812';
-projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
-odv_rfile = fullfile(projectdir,'export_detailed_20210201_19_26','export_detailed_20210201_19_26_ZOO_odv.txt');
-sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel2_survey_20180814-20180909_R0.sb';
+% cruiseid = 'SR1812';
+% odv_rfile = fullfile('export_detailed_20210201_19_26','export_detailed_20210201_19_26_ZOO_odv.txt');
+% sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel2_survey_20180814-20180909_R0.sb';
 
 %% EXPORTSNP process cruise R/V Roger Revelle
 % cruiseid = 'RR1813';
-% projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
-% odv_rfile = fullfile(projectdir,'export_detailed_20210128_08_11','export_detailed_20210128_08_11_ZOO_odv.txt');
+% odv_rfile = fullfile('export_detailed_20210128_08_11','export_detailed_20210128_08_11_ZOO_odv.txt');
 % sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-TaxonomicLevel2_process_20180814-20180909_R0.sb';
+
+
+%% USER INPUT REQUIRED: Specify full path
+if ismac 
+  projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
+else
+  projectdir = fullfile('D:','MATLAB','UVP_project_data',cruiseid);
+end
+odv_rfile = fullfile(projectdir,odv_rfile);
+r2r_elog  = fullfile(projectdir,r2r_elog);
 
 
 %% Specify write filename
@@ -149,9 +179,9 @@ try
   cd(pwd_now);
 catch % catch and explain why script stopped
   fprintf('Cannot load R2R merge script for this project\n')
-  fprintf('Need to set up %s_UVP_R2R_merge.m script, see example provided\n',cruiseid)
-  odv.R2R_Event = [];
-  keyboard
+  %fprintf('Need to set up %s_UVP_R2R_merge.m script, see example provided\n',cruiseid)
+  %odv.R2R_Event = [];
+  %keyboard
 end
 
 %% Define new table
@@ -308,6 +338,7 @@ if ~exist(save_taxa_filename,'file')
   end
   % Call script to go through and query AphiaID matches
   check_children_manual = false; % true = checks full classifcation of parent if child doesn't have a match and asks user. false = skips this.
+  
   taxa = WoRMS_AphiaID_taxa_match(taxa,check_children_manual,'ecotaxa');
   fprintf('Saving taxa matches to %s\n',[pwd filesep save_taxa_filename])
   save(save_taxa_filename,'taxa');

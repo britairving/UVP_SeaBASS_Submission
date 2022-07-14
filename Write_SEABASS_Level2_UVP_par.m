@@ -5,12 +5,20 @@ function Write_SEABASS_Level2_UVP_par
 %   Module and creates a file for submission to NASA's SEABASS database
 %   https://seabass.gsfc.nasa.gov/wiki/Data_Submission/
 %
+%   This script has been used to format data from vertically profiling UVP5
+%   High Definition and UVP6 Low Power models. 
+%
 % Steps:
-%   1. Read in detailed ODV PAR file
-%   2. Format fields and column names following SeaBASS format
-%   3. Define metadata header that will be printed to .sb file
-%   4. Write sb file with DNSD and DVSD
-%   5. Write suplementary sb file with non-differential NSD and VSD
+%   1. USER writes metadata m file to define SeaBASS required headers
+%      format: {cruiseid}_UVP_metadata.m
+%   2. USER defines projectdir, cruiseid, odv_rfile (read file), sb_wfile 
+%      (write file), and r2r_elog (if available and must edit 
+%      UVP_merge_R2R.m for cruise specific r2r log formatting).
+%   3. Script reads in detailed ODV PAR file
+%   4. Script formats fields and column names following SeaBASS format
+%   5. Script formats metadata header that will be printed to .sb file
+%   6. Script writes sb file with DNSD and DVSD
+%   7. Script writes suplementary sb file with non-differential NSD and VSD
 %
 % References:
 %  Picheral M, Colin S, Irisson J-O (2017). EcoTaxa, a tool for the
@@ -21,39 +29,49 @@ function Write_SEABASS_Level2_UVP_par
 %  Ocean Optics Web Book
 %  https://www.oceanopticsbook.info/view/optical-constituents-of-the-ocean/level-3/creating-particle-size-distributions-data
 %
+% Code availabile: https://github.com/britairving/UVP_submission_formatting
+%
 % Authors:
-%  Brita Irving <bkirving@alaska.edu>
-%  Andrew McDonnell <amcdonnell@alaska.edu>
+%  Brita Irving     <bkirving@alaska.edu>
+%  with input from 
+%     Andrew McDonnell <amcdonnell@alaska.edu>
+%     Emmanuel Boss    <emmanuel.boss@maine.edu>
+%     Lee Karp-Boss    <lee.karp-boss@maine.edu>
 %% Define script options
 include_uncertainty = 0; % 1 = writes uncertainty estimate to file, 0 = does not include uncertainty variables, but does include text on how to include it.
-%% Define read and write filenames
 
+%% USER INPUT REQUIRED: Define read and write filenames
+%% EXPORTSNA cruise on the Sarmiento De Gamboa UVP6-LP deployed on a float
+cruiseid  = 'SG2105_UVP6'; 
+odv_rfile = fullfile('export_detailed_20220628_22_58','export_detailed_20220628_22_58_PAR_odv.txt');
+sb_wfile  = 'EXPORTS-EXPORTSNA_UVP6-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
+r2r_elog  = 'EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx';
 
 %% EXPORTSNA cruise on the Sarmiento De Gamboa
 % cruiseid = 'SG2105'; 
-% odv_rfile = fullfile(projectdir,'export_detailed_20211110_11_26','export_detailed_20211110_11_26_PAR_odv.txt');
-% sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
-% r2r_elog  = fullfile(projectdir,'EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx');
+% odv_rfile = fullfile('export_detailed_20211110_11_26','export_detailed_20211110_11_26_PAR_odv.txt');
+% sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
+% r2r_elog  = fullfile('EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx');
 
 %% EXPORTSNA survey cruise on the Discovery
-cruiseid = 'DY131'; 
-odv_rfile = fullfile('export_detailed_20220224_21_05','export_detailed_20220224_21_05_PAR_odv.txt');
-sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_survey_20210504-20210529_R1.sb';
-r2r_elog  = 'R2R_ELOG_dy131_FINAL_EVENTLOG_20210601_094434_EDITED.csv';
+% cruiseid = 'DY131'; 
+% odv_rfile = fullfile('export_detailed_20220224_21_05','export_detailed_20220224_21_05_PAR_odv.txt');
+% sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_survey_20210504-20210529_R1.sb';
+% r2r_elog  = 'R2R_ELOG_dy131_FINAL_EVENTLOG_20210601_094434_EDITED.csv';
 
 %% EXPORTSNP survey cruise on the Sally Ride
 % cruiseid = 'SR1812'; 
-% odv_rfile = fullfile(projectdir,'export_detailed_20210201_19_26','export_detailed_20210201_19_26_PAR_odv.txt');
+% odv_rfile = fullfile('export_detailed_20210201_19_26','export_detailed_20210201_19_26_PAR_odv.txt');
 % sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_survey_20180814-20180909_R1.sb';
-% r2r_elog  = fullfile(projectdir,'R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx');
+% r2r_elog  = fullfile('R2R_ELOG_SR1812_FINAL_EVENTLOG_20180913_022931.xlsx');
 
 %% EXPORTSNP process cruise on the Roger Revelle
 % cruiseid = 'RR1813'; % 
-% odv_rfile = fullfile(projectdir,'export_detailed_20210128_08_11','export_detailed_20210128_08_11_PAR_odv.txt');
+% odv_rfile = fullfile('export_detailed_20210128_08_11','export_detailed_20210128_08_11_PAR_odv.txt');
 % sb_wfile = 'EXPORTS-EXPORTSNP_UVP5-ParticulateLevel2_differential_process_20180814-20180909_R1.sb';
-% r2r_elog  = fullfile(projectdir,'R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx');
+% r2r_elog  = fullfile('R2R_ELOG_RR1813_FINAL_EVENTLOG_20180912_170812.xlsx');
 
-%% Specify full path
+%% USER INPUT REQUIRED: Specify full path
 if ismac 
   projectdir = fullfile('/Users/bkirving/Documents/MATLAB/UVP_project_data',cruiseid);
 else
@@ -61,6 +79,7 @@ else
 end
 odv_rfile = fullfile(projectdir,odv_rfile);
 r2r_elog  = fullfile(projectdir,r2r_elog);
+
 
 %% Specify write filename
 % Release number R0 suggested if data_type=preliminary
@@ -285,20 +304,24 @@ odv2.datetime = [];
 cols2(i_datetime) = [];
 cols2(end-1:end) = []; % original date and time variables at the end
 % Now move r2r event to just after depth
-if ismember('R2R_Event',cols2)
-  ncols = numel(odv2.Properties.VariableNames);
-  % find index location of variables we want to reorder
-  i_r2revent = find(strcmp(odv2.Properties.VariableNames,'R2R_Event'));
-  i_time     = find(strcmp(odv2.Properties.VariableNames,'time'));
-  new_order  = [1:i_time i_r2revent i_time+1:ncols];
-  % Reorder cell array with full column names
-  cols2 = cols2(new_order); % replaced cols2=[cols2(1,1:dt-1) , cols2(1,d) , cols2(1,d+1) , cols2(1,dt+1:d-1) , cols2(1,d+2:end)];
-  odv2 = odv2(:,new_order);
-  % delete redundant variables that result from reordering
-  odv2.R2R_Event_1    = [];
-  cols2(i_r2revent+1) = [];
+try
+  if ismember('R2R_Event',cols2)
+    ncols = numel(odv2.Properties.VariableNames);
+    % find index location of variables we want to reorder
+    i_r2revent = find(strcmp(odv2.Properties.VariableNames,'R2R_Event'));
+    i_time     = find(strcmp(odv2.Properties.VariableNames,'time'));
+    new_order  = [1:i_time i_r2revent i_time+1:ncols];
+    % Reorder cell array with full column names
+    cols2 = cols2(new_order); % replaced cols2=[cols2(1,1:dt-1) , cols2(1,d) , cols2(1,d+1) , cols2(1,dt+1:d-1) , cols2(1,d+2:end)];
+    odv2 = odv2(:,new_order);
+    % delete redundant variables that result from reordering
+    odv2.R2R_Event_1    = [];
+    cols2(i_r2revent+1) = [];
+  end
+catch
+  fprintf('Unable to read / merge R2R event\n')
+  
 end
-
 %% Parse size bin limits from fieldnames
 % split into categories #/L & biovolume
 nperL  = find(contains(cols2,'[#/L]') & ~contains(cols2,'='));
@@ -364,7 +387,6 @@ end
 uvp_diameter_bins_mm = unique(uvp_diameter_bins_mm(isfinite(uvp_diameter_bins_mm)));
 uvp_diameter_bins_mm = round(uvp_diameter_bins_mm,4);
 uvp_diameter_bins_um = uvp_diameter_bins_mm.*1000;
-
 %% Calculate DNSD (Differential number size distribution) [#/m^3/µm] & DVSD (Differential volume size distribution) [µL/m^3/µm]
 % NSD = Same as ecotaxa LPM_(size1-size2)[#/L] variables
 % VSD = same as ecotaxa LPM_biovolume_(size1-size2)[ppm] variables
@@ -730,9 +752,9 @@ end
 fprintf(fileID,'%s\n',hdr_SEABASS{:});  % write header
 fprintf(fileID,fmt,odv_write{:});     % write data
 fclose(fileID);                 % close file
-% To troubleshoot why not printing correctly, comment above and just print to screen
-%fprintf('%s\n',hdr_SEABASS{:}) % write header
-%fprintf(fmt,odv_write{:})      % write data
+%% To troubleshoot why not printing correctly, comment above and just print to screen
+% fprintf('%s\n',hdr_SEABASS{:}) % write header
+% fprintf(fmt,odv_write{:})      % write data
 
 %% Write file with non-differential NSD and VSD
 % Write additional file that includes NSD and VSD. 
@@ -841,9 +863,9 @@ end
 fprintf(fileID,'%s\n',hdr_SEABASS{:}); % write header
 fprintf(fileID,fmt,odv_write{:});      % write data
 fclose(fileID);                 % close file
-% To troubleshoot why not printing correctly, comment above and just print to screen
-%fprintf('%s\n',hdr_SEABASS{:}) % write header
-%fprintf(fmt,odv_write{:})      % write data
+%% To troubleshoot why not printing correctly, comment above and just print to screen
+% fprintf('%s\n',hdr_SEABASS{:}) % write header
+% fprintf(fmt,odv_write{:})      % write data
 
 
 fprintf('workflow is finished\n')

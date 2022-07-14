@@ -67,10 +67,14 @@ fields.eventID.rawfield    = 'sample_id'; % This is the same as station_alt_id i
 % Changing instrument_imageID to catalogNumber per NASA recommendation, and
 % per darwin cor/OBIS team recommending, adding cruise name to make it
 % globally unique.
+% 7/14/2022 set calculate_2 field in case object_rawvig is not a field,
+% which is the case for (at least one) UVP6LP downloaded 6/28/2022
 fields.catalogNumber.description = 'A globally unique identifier associated with the sample as an event';
 fields.catalogNumber.requirement = 'optional'; %
 fields.catalogNumber.units       = 'none'; 
 fields.catalogNumber.calculate   = 'strcat(cruiseid,''_'',raw.object_rawvig)'; % 
+fields.catalogNumber.calculate_2 = 'strcat(cruiseid,''_'',raw.object_id,''_'',raw.objid)'; % concatenate object_id and objid because don't know what else to do...
+
 
 % Fields not listed in SeaBASS wiki on plankton_and_particles (see
 % comments) but important to note
@@ -94,11 +98,14 @@ fields.date.requirement = 'optional';
 fields.date.units       = 'yyyymmdd'; 
 fields.date.rawfield    = 'object_date'; % E.g. date = raw.object_date;
 
+% 7/14/2022 set calculate_2 field in case object_rawvig is not a field,
+% which is the case for (at least one) UVP6LP downloaded 6/28/2022
 fields.time.description = 'Sample time';
 fields.time.requirement = 'optional'; 
 fields.time.units       = 'hh:mm:ss'; 
 fields.time.calculate   = "insertAfter(insertAfter(extractBetween(raw.object_rawvig,9,14),2,':'),5,':')"; % pull out time from object_rawvig field then convert from hhmmss to hh:mm:ss 
-% fields.time.calculate   = "insertAfter(insertAfter(raw.object_time,2,':'),5,':')"; % Convert from hhmmss to hh:mm:ss
+fields.time.calculate_2 = "insertAfter(insertAfter(raw.object_time,2,':'),5,':')"; % Convert from hhmmss to hh:mm:ss
+
 
 fields.R2R_Event.description = 'Rolling Deck to Repository (R2R) Unique sample event number';
 fields.R2R_Event.requirement = 'optional'; 
@@ -130,11 +137,13 @@ fields.associatedMedia.rawfield    = 'img_file_name'; % e.g. images/Annelida/106
 % scientificNameID_automated    = 'urn:lsid:marinespecies.org:taxname:367360'
 % scientificName_manual         = 'Aulosphaeridae'
 % scientificNameID_manual       = 'urn:lsid:marinespecies.org:taxname:367360'
+% 7/14/2022 set calculate_2 field in case object_annotation_hierarchy is not a field, which is the case for (at least one) UVP6LP downloaded 6/28/2022
 fields.data_provider_category_manual.description = 'A category used by the data provider to name the organism or particle for a manual identification, not necessarily a scientific name.';
 fields.data_provider_category_manual.requirement = 'optional'; % (recommended but optional) 
 fields.data_provider_category_manual.units       = 'none';
 % fields.data_provider_category_manual.rawfield    = 'object_annotation_category';  % e.g. 'Annelida' from object_annotation_hierarchy = 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
-fields.data_provider_category_manual.rawfield    = 'object_annotation_hierarchy'; % e.g. 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
+fields.data_provider_category_manual.rawfield    = 'object_annotation_hierarchy';   % e.g. 'living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Annelida'
+fields.data_provider_category_manual.rawfield_2  = 'object_annotation_category';    % e.g. 'Annelida' becuase UVP6LP does not have object_annotation_hierarchy
 
 % % Andrew requested that all fields with the "autumated" suffix be removed becuase all of our images were categorized by a human, so they should all end in _manual.  
 % fields.data_provider_category_automated.description = 'A category used by the data provider to name the organism or particle for an automated classification, not necessarily a scientific name (e.g., pennate or detritus).';
@@ -173,17 +182,17 @@ fields.area_cross_section.calculate   = "str2double(raw.object_area) .* str2doub
 fields.length_representation.description = 'Representation of length of the target detected within the ROI or largest mesh size for which the target could be retained, determined by means specified in the image processing method or protocol document.';
 fields.length_representation.requirement = 'required'; %
 fields.length_representation.units       = 'um'; 
-fields.length_representation.calculate   = "str2double(raw.object_major) .* str2double(raw.process_pixel)"; % object_major(primary axis of the best fitting ellipse for the object in pixel)*process_pixel(pixel size in ?m)
+fields.length_representation.calculate   = "str2double(raw.object_major) .* str2double(raw.process_pixel)"; % object_major(primary axis of the best fitting ellipse for the object in pixel)*process_pixel(pixel size in um)
 
 fields.width_representation.description = 'Representation of width of the target detected within the ROI or smallest mesh size through which the target could pass, determined by means specified in the image processing method or protocol document.';
 fields.width_representation.requirement = 'required'; %
 fields.width_representation.units       = 'um'; 
-fields.width_representation.calculate   = "str2double(raw.object_minor) .* str2double(raw.process_pixel)";  % object_minor(secondary axis of the best fitting ellipse for the object in pixel)*process_pixel(pixel size in ?m)
+fields.width_representation.calculate   = "str2double(raw.object_minor) .* str2double(raw.process_pixel)";  % object_minor(secondary axis of the best fitting ellipse for the object in pixel)*process_pixel(pixel size in um)
 
 fields.equivalent_spherical_diameter.description = 'Equivalent spherical diameter of the target detected within the ROI determined by means specified in the image processing method or protocol document.';
 fields.equivalent_spherical_diameter.requirement = 'optional'; %
 fields.equivalent_spherical_diameter.units       = 'um'; 
-fields.equivalent_spherical_diameter.calculate   = "str2double(raw.object_esd) .* str2double(raw.process_pixel)"; % object_esd(!!!assuming this is equivalent spherical diameter in pixels!!!)*process_pixel(pixel size in ?m)
+fields.equivalent_spherical_diameter.calculate   = "str2double(raw.object_esd) .* str2double(raw.process_pixel)"; % object_esd(!!!assuming this is equivalent spherical diameter in pixels!!!)*process_pixel(pixel size in um)
 
 % fields.area_based_diameter.description = 'Area-based diameter of the target detected within the ROI determined by means specified in the image processing method or protocol document.';      
 % fields.area_based_diameter.requirement = 'optional'; %

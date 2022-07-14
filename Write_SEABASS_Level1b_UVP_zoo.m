@@ -88,9 +88,10 @@ function Write_SEABASS_Level1b_UVP_zoo
 %  Brita Irving     <bkirving@alaska.edu>
 
 %% ** USER INPUT REQUIRED ** > Define cruise ID
-%cruiseid = 'SR1812';% EXPORTSNP survey cruise R/V Sally Ride 2018
-%cruiseid = 'RR1813';% EXPORTSNP process cruise R/V Roger Revelle 2018
-cruiseid = 'DY131';% EXPORTSNA survey cruise R/V Discovery 2021
+% cruiseid = 'SR1812';% EXPORTSNP survey cruise R/V Sally Ride 2018
+% cruiseid = 'RR1813';% EXPORTSNP process cruise R/V Roger Revelle 2018
+% cruiseid = 'DY131';% EXPORTSNA survey cruise R/V Discovery 2021
+cruiseid = 'SG2105_UVP6';% EXPORTSNA UVP6LP on the SdG2105
 
 %% ** USER INPUT REQUIRED ** > Define project directory
 if ismac 
@@ -132,6 +133,9 @@ cfg.ptwg_namespace.url         = 'https://seabass.gsfc.nasa.gov/ptwg_namespace_v
 
 %% Build read filename 
 raw_rfile = fullfile(projectdir,hdr.ecotaxaf,[hdr.ecotaxaf '.tsv']); % based on project directory and exported ecotaxa name
+if ~exist(raw_rfile,'file')
+  raw_rfile = fullfile(projectdir,hdr.ecotaxaf,['ecotaxa_' hdr.ecotaxaf '.tsv']); % based on project directory and exported ecotaxa name
+end
 assessed_id_file = ['Assessed_id_list_' cruiseid '.csv'];            % Providing a list of all scientificName/scientificNameID pairs assessed by the automated classifier with the data submission enables the determination of both presence and absence of annotations in the Level 1b file. Supplementary lists of which taxonomic categories were assessed by manual and/or automatic classification methods are strongly recommended and are required as part of data submissions if not every ROI in a given datafile was classified. If every ROI was not classified, these lists are essential for the downstream creation of summary products involving the concentrations of phytoplankton taxa. 
 
 %% Unique namespace for non-conforming ROIs
@@ -162,29 +166,76 @@ for ns = 1:numel(raw.Properties.VariableNames)
   end
 end
 
+
+%% Add field "process_pixel
+if ~ismember('process_pixel',raw.Properties.VariableNames) && contains(cruiseid,'UVP6')
+  % UVP6 LP ( at least the file downloaded 6/28/2022 for the
+  % ecotaxa project https://ecotaxa.obs-vlfr.fr/prj/5579
+  % process_pixel is NOT a field in the exported TSV file.. but acq_pixel
+  % is a field and is in mm, not micrometer, so need to convert it.
+  raw.process_pixel = strcat({'0.0'}, raw.acq_pixel); % just do string function, rather than converting to double, caluclating, then converting bck to cell array
+end
 %% Remove bad object_id 
 if isfield(hdr,'bad_object_id')
   bad = contains(raw.object_id,hdr.bad_object_id);
   raw(bad,:) = [];
 end
 
+%% Determine if hierarchy is present in data
+% It appears that Ecotaxa changed their column names between 2021 and 2022,
+% so now there is not a object_annotation_hierarchy column and is instead
+% very limited to object_annotation_category... 
+% If this is the case, run the Write_SEABASS_Level2_UVP_zoo.m file first
+% and it will save the taxa file, which should contain all the info needed
+% here. 
+% For example...
+%  raw.object_annotation_hierarchy = living>Eukaryota>Opisthokonta>Holozoa>Metazoa>Arthropoda>Crustacea
+%  raw.object_annotation_category  = Crustacea;
+% Clearly, the hierarchy is much more detailed...
+if ~ismember('object_annotation_hierarchy',raw.Properties.VariableNames)
+  fprintf('"object_annotation_hierarchy" field is missing... Must run Write_SEABASS_Level2_UVP_zoo.m first\n');
+  fprintf('  that will write the necessary taxa mat file\n');
+  has_hierarchy = 0;
+else
+  has_hierarchy = 1; 
+end
+
 %% Pull out unique taxa
 % This is necessary to query WoRMS and get the ScientificName and
 % ScientficNameID 
-[original_fields  ,iu] = unique(raw.object_annotation_hierarchy);
-% Initialize fields
-raw.child_name  = raw.object_annotation_hierarchy;
-raw.parent_name = raw.object_annotation_hierarchy;
-for nt = 1:numel(original_fields  )
-  str = strsplit(original_fields  {nt},'>');
-  idx_nt = strcmp(raw.object_annotation_hierarchy,original_fields  {nt});
-  raw.child_name(idx_nt) =  str(end);
-  raw.parent_name(idx_nt) = str(end-1);
+if has_hierarchy
+  [original_fields  ,iu] = unique(raw.object_annotation_hierarchy);
+  % Initialize fields
+  raw.child_name  = raw.object_annotation_hierarchy;
+  raw.parent_name = raw.object_annotation_hierarchy;
+  for nt = 1:numel(original_fields  )
+    str = strsplit(original_fields  {nt},'>');
+    idx_nt = strcmp(raw.object_annotation_hierarchy,original_fields  {nt});
+    raw.child_name(idx_nt) =  str(end);
+    raw.parent_name(idx_nt) = str(end-1);
+  end
+  % Define taxa filename
+  save_taxa_filename = fullfile(projectdir,[cruiseid 'taxa.mat']);
+else
+  % 
+  [original_fields  ,iu] = unique(raw.object_annotation_category);
+  
+  % Initialize fields
+  raw.child_name  = raw.object_annotation_category;
+  raw.parent_name = raw.object_annotation_category;
+  for nt = 1:numel(original_fields  )
+    str = strsplit(original_fields  {nt},'<');
+    idx_nt = strcmp(raw.object_annotation_category,original_fields  {nt});
+    raw.child_name(idx_nt) =  str(1);
+    if numel(str)> 1
+      raw.parent_name(idx_nt) = str(2);
+    end
+  end
+  % Define taxa filename -- read in level2 taxa file!
+  save_taxa_filename = fullfile(projectdir,[cruiseid 'taxa_level2.mat']);
 end
 
 %% Query WoRMS to pull out AphiaID match for each taxonomic name
-% save_taxa_filename = [cruiseid 'taxa_' date '.mat'];
-save_taxa_filename = fullfile(projectdir,[cruiseid 'taxa.mat']);
 if ~exist(save_taxa_filename,'file')
   % Initialize table used as input to WoRMS_AphiaID_taxa_match.m script.
   % Inputs:
@@ -423,35 +474,84 @@ for ncol = 1:numel(colnames)
   fname = colnames{ncol};
   try
     if isfield(fields.(fname),'rawfield')
-      uvp.(fname) = raw.(fields.(fname).rawfield);
-      colstrns = [colstrns; fname];
-      colunits = [colunits; fields.(fname).units];
-      if iscell(uvp.(fname))
-        fmt = [fmt; '%s'];
-      else
-        fmt = [fmt; '%.4f'];
+      try
+        uvp.(fname) = raw.(fields.(fname).rawfield);
+        colstrns = [colstrns; fname];
+        colunits = [colunits; fields.(fname).units];
+        if iscell(uvp.(fname))
+          fmt = [fmt; '%s'];
+        else
+          fmt = [fmt; '%.4f'];
+        end
+      catch
+        if isfield(fields.(fname),'rawfield_2')
+          uvp.(fname) = raw.(fields.(fname).rawfield_2);
+          colstrns = [colstrns; fname];
+          colunits = [colunits; fields.(fname).units];
+          if iscell(uvp.(fname))
+            fmt = [fmt; '%s'];
+          else
+            fmt = [fmt; '%.4f'];
+          end
+        else
+          if strcmp(fields.(fname).requirement, 'optional')
+            continue
+          else
+            keyboard
+          end
+        end
       end
     elseif isfield(fields.(fname),'calculate')
-      fprintf(' calculating... %s = %s\n',fname,fields.(fname).calculate)
-      uvp.(fname) = eval(fields.(fname).calculate);
-      colstrns = [colstrns; fname];
-      colunits = [colunits; fields.(fname).units];
-      if iscell(uvp.(fname))
-        fmt = [fmt; '%s'];
-      else % set resolution to 4 significant figures
-        fmt = [fmt; '%.4f'];
+      try
+        fprintf(' calculating... %s = %s\n',fname,fields.(fname).calculate)
+        uvp.(fname) = eval(fields.(fname).calculate);
+        colstrns = [colstrns; fname];
+        colunits = [colunits; fields.(fname).units];
+        if iscell(uvp.(fname))
+          fmt = [fmt; '%s'];
+        else % set resolution to 4 significant figures
+          fmt = [fmt; '%.4f'];
+        end
+      catch
+        if isfield(fields.(fname),'calculate_2')
+          uvp.(fname) = eval(fields.(fname).calculate_2);
+          colstrns = [colstrns; fname];
+          colunits = [colunits; fields.(fname).units];
+          if iscell(uvp.(fname))
+            fmt = [fmt; '%s'];
+          else % set resolution to 4 significant figures
+            fmt = [fmt; '%.4f'];
+          end
+        else
+          if strcmp(fields.(fname).requirement, 'optional')
+            fprintf('NOT calculating %s because not possilbe\n',fname)
+            continue
+          else
+            keyboard
+          end
+        end
       end
     else
       fprintf('unknown case...%s\n',fname)
     end
   catch
     fprintf(' skipping "%s" for now...\n',fname)
-    %keyboard
+    keyboard
   end
 end
 
-%% Set non-living objects  scientificName_manual to -9999  
-uvp.scientificName_manual(contains(raw.object_annotation_hierarchy,'not-living')) = {'-9999'};
+%% Set non-living objects  scientificName_manual to -9999
+if ~has_hierarchy
+  taxa_names = taxa.Name;
+  idx_not_living = find(strcmp(taxa_names,'not-living'));
+  idx_temporary  = find(strcmp(taxa_names,'temporary'));
+  all_nonliving = taxa_names(idx_not_living:idx_temporary-1);
+  set_to_not_living = ismember(raw.child_name,all_nonliving);
+  uvp.scientificName_manual(set_to_not_living) = {'-9999'};
+else
+  uvp.scientificName_manual(contains(raw.object_annotation_hierarchy,'not-living')) = {'-9999'};
+end
+
 %% Remove the hierarchy from data_provider_category_manual
 % The field data_provider_category_manual should have the last category.
 % For example, not-living>artefact>bubble, should be a bubble.
@@ -494,7 +594,6 @@ elseif any(contains(raw.child_name,' '))
   end
 end
   
-
 %% Write single sb file for entire dataset, or split by eventID
 if cfg.single_sb_file
   num_sb_files = 1;
@@ -509,7 +608,7 @@ else
   colunits(idx_rm) = [];
   fmt(idx_rm)      = [];
 end
-
+keyboard
 %% Combine column names, units, and format into a single string
 colunits = strjoin(colunits,','); 
 % Combine column names into a single string
@@ -687,7 +786,9 @@ assessed.scientificName_manual   = uvp.scientificName_manual(idx_unique);
 assessed.scientificNameID_manual = uvp.scientificNameID_manual(idx_unique);
 % add hierarchy to assess file because it was not allowed to stay in the
 % "data_provider_category_manual" field.
-assessed.data_provider_category_manual_annotation_hierarchy = raw.object_annotation_hierarchy(idx_unique);
+if has_hierarchy
+  assessed.data_provider_category_manual_annotation_hierarchy = raw.object_annotation_hierarchy(idx_unique);
+end
 % assessed.data_provider_category_manual_classification = 
 assessed = struct2table(assessed);
 writetable(assessed,fullfile(projectdir,assessed_id_file),'Delimiter',',');

@@ -501,7 +501,9 @@ if strcmp(data_provider,'ecotaxa')
     % family tree and find match
     if strcmp(taxa.AphiaID{n_id},'NULL') && strcmp(taxa.AphiaID_parent{n_id},'NULL')
       family = strsplit(taxa.Name_original{n_id},'>');
-      family = fliplr(family); % search from lowest level
+      if numel(family) > 1
+        family = fliplr(family); % search from lowest level
+      end
       for nhierachy = 1:numel(family)
         family_name = family{nhierachy};
         if any(strcmp(taxa.scientificName,family_name))
