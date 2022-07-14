@@ -42,16 +42,16 @@ include_uncertainty = 0; % 1 = writes uncertainty estimate to file, 0 = does not
 
 %% USER INPUT REQUIRED: Define read and write filenames
 %% EXPORTSNA cruise on the Sarmiento De Gamboa UVP6-LP deployed on a float
-cruiseid  = 'SG2105_UVP6'; 
-odv_rfile = fullfile('export_detailed_20220628_22_58','export_detailed_20220628_22_58_PAR_odv.txt');
-sb_wfile  = 'EXPORTS-EXPORTSNA_UVP6-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
-r2r_elog  = 'EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx';
+% cruiseid  = 'SG2105_UVP6'; 
+% odv_rfile = fullfile('export_detailed_20220628_22_58','export_detailed_20220628_22_58_PAR_odv.txt');
+% sb_wfile  = 'EXPORTS-EXPORTSNA_UVP6-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
+% r2r_elog  = 'EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx';
 
 %% EXPORTSNA cruise on the Sarmiento De Gamboa
-% cruiseid = 'SG2105'; 
-% odv_rfile = fullfile('export_detailed_20211110_11_26','export_detailed_20211110_11_26_PAR_odv.txt');
-% sb_wfile = 'EXPORTS-EXPORTSNA_UVP5-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
-% r2r_elog  = fullfile('EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx');
+cruiseid = 'SG2105'; 
+odv_rfile = fullfile('export_detailed_20211110_11_26','export_detailed_20211110_11_26_PAR_odv.txt');
+sb_wfile = 'OTZ_WHOI_SG2105_UVP5-ParticulateLevel2_differential_sdg_20210504-20210519_R1.sb';
+r2r_elog  = fullfile('EXPORTSNA_SarmientoDeGamboa_r2r_logs_original.xlsx');
 
 %% EXPORTSNA survey cruise on the Discovery
 % cruiseid = 'DY131'; 
@@ -180,6 +180,13 @@ table_options.VariableNames{contains(table_options.VariableNames,'Depth_m')} = '
 
 % STEP2 - read ODV particle data from file
 odv = readtable(odv_rfile,table_options);
+
+%% Catch incorrect latitude/longitude
+if strcmp(cruiseid,'SG2105')
+  idx_edit = strcmp(odv.profile,'sg2105_002');
+  odv.latitude(idx_edit)  = 44.6405;
+  odv.longitude(idx_edit) = -11.619;
+end
 
 %% Read R2R eventlog
 if exist(r2r_elog,'file')
